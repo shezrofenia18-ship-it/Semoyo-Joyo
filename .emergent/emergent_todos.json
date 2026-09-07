@@ -1,0 +1,38 @@
+[
+  {
+    "content": "Phase 1: PostgreSQL install + running (done), add DATABASE_URL, ensure_postgres.sh self-healing",
+    "status": "completed"
+  },
+  {
+    "content": "Phase 1: db.py + models + test_core.py roundtrip POC pass",
+    "status": "completed"
+  },
+  {
+    "content": "Get Midtrans integration playbook (sandbox structure)",
+    "status": "completed"
+  },
+  {
+    "content": "Phase 2: Design guidelines via design_agent",
+    "status": "completed"
+  },
+  {
+    "content": "Phase 2: Backend full implementation (routers, auth, checkout, payments, admin, seed)",
+    "status": "completed"
+  },
+  {
+    "content": "Phase 2: Frontend full implementation (Beranda, Keranjang, Checkout, Pembayaran, Pesanan, Admin)",
+    "status": "completed"
+  },
+  {
+    "content": "Phase 2: Docker/Coolify files (Dockerfiles, docker-compose, README-DEPLOY)",
+    "status": "completed"
+  },
+  {
+    "content": "Phase 2: All user stories covered in development",
+    "status": "completed"
+  },
+  {
+    "content": "Phase 2: End to End Testing using Testing Agent + fix all issues",
+    "status": "completed"
+  }
+]
