@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300" width="300" height="300" shape-rendering="crispEdges">
+  <rect width="300" height="300" fill="#ffffff"/>
+  <g fill="#1f2937">
+    <!-- finder patterns -->
+    <rect x="20" y="20" width="70" height="70"/><rect x="30" y="30" width="50" height="50" fill="#fff"/><rect x="40" y="40" width="30" height="30"/>
+    <rect x="210" y="20" width="70" height="70"/><rect x="220" y="30" width="50" height="50" fill="#fff"/><rect x="230" y="40" width="30" height="30"/>
+    <rect x="20" y="210" width="70" height="70"/><rect x="30" y="220" width="50" height="50" fill="#fff"/><rect x="40" y="230" width="30" height="30"/>
+    <!-- timing + data pattern (decorative) -->
+    <rect x="100" y="20" width="10" height="10"/><rect x="120" y="20" width="10" height="10"/><rect x="140" y="20" width="10" height="10"/><rect x="160" y="20" width="10" height="10"/><rect x="180" y="20" width="10" height="10"/>
+    <rect x="100" y="40" width="20" height="10"/><rect x="150" y="40" width="10" height="20"/><rect x="170" y="40" width="20" height="10"/>
+    <rect x="110" y="60" width="10" height="20"/><rect x="130" y="60" width="10" height="10"/><rect x="170" y="60" width="10" height="10"/><rect x="190" y="60" width="10" height="20"/>
+    <rect x="100" y="80" width="10" height="10"/><rect x="140" y="80" width="30" height="10"/>
+    <rect x="20" y="100" width="10" height="10"/><rect x="40" y="100" width="10" height="10"/><rect x="60" y="100" width="10" height="10"/><rect x="80" y="100" width="10" height="10"/>
+    <rect x="100" y="100" width="20" height="10"/><rect x="130" y="100" width="10" height="30"/><rect x="160" y="100" width="10" height="10"/><rect x="180" y="100" width="20" height="10"/>
+    <rect x="210" y="100" width="10" height="10"/><rect x="230" y="100" width="10" height="10"/><rect x="250" y="100" width="10" height="10"/><rect x="270" y="100" width="10" height="10"/>
+    <rect x="30" y="120" width="20" height="10"/><rect x="70" y="120" width="10" height="20"/><rect x="100" y="120" width="10" height="10"/><rect x="150" y="120" width="20" height="10"/><rect x="190" y="120" width="10" height="30"/><rect x="220" y="120" width="10" height="10"/><rect x="240" y="120" width="30" height="10"/>
+    <rect x="20" y="140" width="10" height="20"/><rect x="50" y="140" width="10" height="10"/><rect x="90" y="140" width="30" height="10"/><rect x="130" y="140" width="10" height="10"/><rect x="160" y="140" width="10" height="20"/><rect x="210" y="140" width="20" height="10"/><rect x="260" y="140" width="20" height="10"/>
+    <rect x="40" y="160" width="30" height="10"/><rect x="80" y="160" width="10" height="10"/><rect x="110" y="160" width="10" height="10"/><rect x="140" y="160" width="10" height="10"/><rect x="180" y="160" width="20" height="10"/><rect x="230" y="160" width="10" height="20"/><rect x="250" y="160" width="10" height="10"/><rect x="270" y="160" width="10" height="10"/>
+    <rect x="20" y="180" width="10" height="10"/><rect x="60" y="180" width="10" height="10"/><rect x="90" y="180" width="20" height="10"/><rect x="120" y="180" width="10" height="20"/><rect x="150" y="180" width="30" height="10"/><rect x="210" y="180" width="10" height="10"/><rect x="260" y="180" width="20" height="10"/>
+    <rect x="100" y="210" width="10" height="10"/><rect x="130" y="210" width="20" height="10"/><rect x="170" y="210" width="10" height="10"/><rect x="200" y="210" width="10" height="30"/><rect x="220" y="210" width="10" height="10"/><rect x="250" y="210" width="10" height="20"/>
+    <rect x="110" y="230" width="10" height="20"/><rect x="150" y="230" width="10" height="10"/><rect x="180" y="230" width="10" height="10"/><rect x="230" y="230" width="10" height="10"/><rect x="270" y="230" width="10" height="20"/>
+    <rect x="100" y="250" width="10" height="10"/><rect x="130" y="250" width="30" height="10"/><rect x="170" y="250" width="10" height="20"/><rect x="210" y="250" width="20" height="10"/><rect x="250" y="250" width="10" height="10"/>
+    <rect x="120" y="270" width="10" height="10"/><rect x="150" y="270" width="10" height="10"/><rect x="190" y="270" width="20" height="10"/><rect x="230" y="270" width="10" height="10"/><rect x="260" y="270" width="20" height="10"/>
+  </g>
+  <rect x="115" y="115" width="70" height="70" rx="8" fill="#ffffff" stroke="#1f2937" stroke-width="3"/>
+  <text x="150" y="143" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700" text-anchor="middle" fill="#1f2937">QRIS</text>
+  <text x="150" y="162" font-family="Arial, Helvetica, sans-serif" font-size="9" text-anchor="middle" fill="#6b7280">PLACEHOLDER</text>
+</svg>

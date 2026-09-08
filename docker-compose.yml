@@ -1,0 +1,55 @@
+# Coolify / VPS deployment: PostgreSQL + FastAPI backend + React (nginx) frontend
+# Usage: copy .env.example -> .env, edit values, then `docker compose up -d --build`
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-mbg_erp}
+      POSTGRES_USER: ${POSTGRES_USER:-mbg_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_this_password}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mbg_user} -d ${POSTGRES_DB:-mbg_erp}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-mbg_user}:${POSTGRES_PASSWORD:-change_this_password}@postgres:5432/${POSTGRES_DB:-mbg_erp}
+      AUTO_START_LOCAL_PG: "false"
+      CORS_ORIGINS: ${CORS_ORIGINS:-*}
+      JWT_SECRET: ${JWT_SECRET:-please-change-this-secret}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
+      APP_URL: ${APP_URL:-}
+      MIDTRANS_SERVER_KEY: ${MIDTRANS_SERVER_KEY:-}
+      MIDTRANS_CLIENT_KEY: ${MIDTRANS_CLIENT_KEY:-}
+      MIDTRANS_IS_PRODUCTION: ${MIDTRANS_IS_PRODUCTION:-false}
+    volumes:
+      - uploads:/app/uploads
+    expose:
+      - "8001"
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        REACT_APP_BACKEND_URL: ${APP_URL:-}
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+
+volumes:
+  pgdata:
+  uploads:

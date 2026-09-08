@@ -1,0 +1,132 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
+
+body {
+    margin: 0;
+    font-family: 'Manrope', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+.font-display {
+    font-family: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
+}
+
+code {
+    font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
+}
+
+@layer base {
+    :root {
+        /* Semoyo Joyo brand: Biru #0B4EA2, Kuning #F5C400, Putih */
+        --background: 0 0% 100%;
+        --foreground: 217 45% 14%;
+        --card: 0 0% 100%;
+        --card-foreground: 217 45% 14%;
+        --popover: 0 0% 100%;
+        --popover-foreground: 217 45% 14%;
+        --primary: 213 87% 34%;
+        --primary-foreground: 0 0% 100%;
+        --secondary: 214 60% 96%;
+        --secondary-foreground: 217 45% 16%;
+        --muted: 214 30% 96%;
+        --muted-foreground: 215 18% 42%;
+        --accent: 48 100% 92%;
+        --accent-foreground: 40 90% 18%;
+        --brand-yellow: 48 100% 48%;
+        --brand-yellow-foreground: 217 45% 14%;
+        --destructive: 0 72% 52%;
+        --destructive-foreground: 0 0% 98%;
+        --border: 214 25% 88%;
+        --input: 214 25% 88%;
+        --ring: 213 87% 34%;
+        --chart-1: 213 87% 34%;
+        --chart-2: 48 100% 48%;
+        --chart-3: 205 55% 55%;
+        --chart-4: 40 90% 60%;
+        --chart-5: 217 45% 22%;
+        --radius: 0.75rem;
+    }
+}
+
+@layer base {
+    * {
+        @apply border-border;
+    }
+    body {
+        @apply bg-background text-foreground selection:bg-accent selection:text-accent-foreground;
+    }
+    h1, h2, h3, h4 {
+        @apply font-display;
+    }
+}
+
+@media print {
+    @page { size: A4; margin: 12mm; }
+    body { background: #fff !important; }
+    .no-print, header.sticky, footer, [data-testid="floating-cart-button"], [data-sonner-toaster] { display: none !important; }
+    main { padding: 0 !important; }
+    .receipt { border: 0 !important; box-shadow: none !important; padding: 0 !important; border-radius: 0 !important; }
+    * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+.no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+.hero-gradient {
+    background-image:
+        radial-gradient(60% 60% at 20% 10%, hsl(213 80% 93%) 0%, transparent 60%),
+        radial-gradient(50% 50% at 80% 0%, hsl(48 100% 90%) 0%, transparent 55%);
+}
+
+.noise-bg {
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch"/></filter><rect width="120" height="120" filter="url(%23n)" opacity="0.05"/></svg>');
+    background-repeat: repeat;
+}
+
+@keyframes fade-up {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-up {
+    animation: fade-up 0.35s ease-out both;
+}
+
+@layer base {
+    [data-debug-wrapper="true"] {
+        display: contents !important;
+    }
+    [data-debug-wrapper="true"] > * {
+        margin-left: inherit;
+        margin-right: inherit;
+        margin-top: inherit;
+        margin-bottom: inherit;
+        padding-left: inherit;
+        padding-right: inherit;
+        padding-top: inherit;
+        padding-bottom: inherit;
+        column-gap: inherit;
+        row-gap: inherit;
+        gap: inherit;
+        border-left-width: inherit;
+        border-right-width: inherit;
+        border-top-width: inherit;
+        border-bottom-width: inherit;
+        border-left-style: inherit;
+        border-right-style: inherit;
+        border-top-style: inherit;
+        border-bottom-style: inherit;
+        border-left-color: inherit;
+        border-right-color: inherit;
+        border-top-color: inherit;
+        border-bottom-color: inherit;
+    }
+}

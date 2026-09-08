@@ -1,0 +1,26 @@
+[
+  {
+    "content": "Backend: routers/reports.py - GET /admin/reports/sales (owner only, date range, summary + rows)",
+    "status": "completed"
+  },
+  {
+    "content": "Backend: Excel export (.xlsx via openpyxl) with header, sheet names, summary",
+    "status": "completed"
+  },
+  {
+    "content": "Backend: PDF export (reportlab) with Semoyo Joyo logo/kop, print-ready",
+    "status": "completed"
+  },
+  {
+    "content": "Frontend: AdminReportsPage (/admin/laporan) - filter periode, ringkasan, tabel sortable, tombol Excel/PDF; nav owner-only",
+    "status": "completed"
+  },
+  {
+    "content": "Seed sample paid orders for verification; update requirements.txt",
+    "status": "completed"
+  },
+  {
+    "content": "Testing agent: end-to-end test of Laporan feature (API + UI + downloads)",
+    "status": "completed"
+  }
+]
