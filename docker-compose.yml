@@ -42,13 +42,12 @@ services:
   frontend:
     build:
       context: ./frontend
-      args:
-        REACT_APP_BACKEND_URL: ${APP_URL:-}
+      dockerfile: Dockerfile
     restart: unless-stopped
     depends_on:
       - backend
     ports:
-      - "${FRONTEND_PORT:-3000}:80"
+      - "3000:80"
 
 volumes:
   pgdata:
