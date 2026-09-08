@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { NavLink, Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { LayoutDashboard, Package, Tags, ClipboardList, LogOut, Store, Boxes, ScrollText, Bell, BellOff, ShieldCheck, UserCog } from "lucide-react";
+import { LayoutDashboard, Package, Tags, ClipboardList, LogOut, Store, Boxes, ScrollText, Bell, BellOff, ShieldCheck, UserCog, FileBarChart2 } from "lucide-react";
 import { useAdminEvents } from "@/hooks/useAdminEvents";
 import { BrandIcon, BRAND_NAME } from "@/components/Brand";
 import { Button } from "@/components/ui/button";
@@ -26,7 +26,10 @@ const UnreadDot = ({ to, unread }) => (to === "/admin/pesanan" && unread > 0 ? (
   <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1.5 text-[11px] font-bold text-white" data-testid="admin-unread-orders-badge">{unread}</span>
 ) : null);
 
-const OWNER_NAV = [{ to: "/admin/audit-log", label: "Audit Log", icon: ScrollText, testid: "admin-nav-audit-log", ownerOnly: true }];
+const OWNER_NAV = [
+  { to: "/admin/laporan", label: "Laporan", icon: FileBarChart2, testid: "admin-nav-reports", ownerOnly: true },
+  { to: "/admin/audit-log", label: "Audit Log", icon: ScrollText, testid: "admin-nav-audit-log", ownerOnly: true },
+];
 
 export const AdminLayout = () => {
   const { admin, logoutAdmin, isOwner, refreshAdmin } = useAuth();

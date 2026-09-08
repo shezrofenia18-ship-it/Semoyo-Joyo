@@ -125,3 +125,6 @@
 - [ ] Phase 3 (berikutnya, sesuai permintaan user): ERP mini lanjutan (stok masuk/keluar, pembelian ke supplier, laporan), ongkir, notifikasi WA, aktivasi Midtrans dengan key asli, invoice PDF.
 
 - [x] BUGFIX (pod restart): binary PostgreSQL dibundel di /root/pg15 (persisten), ensure_postgres.sh pakai bundle tanpa apt, lifespan retry DB init. Verified via testing agent (iteration_2, 100%).
+- [x] WORKSPACE BARU (git clone): PG15 diinstal ulang + bundle /root/pg15, backend/.env dibuat ulang, seed otomatis 7 kategori/38 produk.
+- [x] Phase 3a SELESAI: Laporan Penjualan (Owner-only) /admin/laporan — filter periode, ringkasan (omzet/HPP/laba/pesanan lunas), tabel sortable, export Excel (.xlsx) & PDF berkop logo. routers/reports.py. Testing agent iteration_4: backend 100%, frontend lulus.
+- [ ] Phase 3 sisa: PO ke supplier, ongkir, notifikasi WA, invoice PDF per pesanan, aktivasi Midtrans key asli.

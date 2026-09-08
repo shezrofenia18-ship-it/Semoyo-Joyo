@@ -6,8 +6,9 @@ import requests
 import json
 from typing import Optional
 
-BASE_URL = "https://joyo-deploy.preview.emergentagent.com/api"
+BASE_URL = "https://ship-it-demo.preview.emergentagent.com/api"
 ADMIN_TOKEN: Optional[str] = None
+OWNER_TOKEN: Optional[str] = None
 
 def log(msg: str):
     print(f"[TEST] {msg}")
@@ -34,9 +35,29 @@ def admin_login():
     success(f"Admin logged in successfully. Token: {ADMIN_TOKEN[:20]}...")
     return True
 
+def owner_login():
+    """Login as owner and get access token"""
+    global OWNER_TOKEN
+    log("Logging in as owner...")
+    resp = requests.post(f"{BASE_URL}/admin/login", json={
+        "username": "owner",
+        "password": "owner123"
+    })
+    if resp.status_code != 200:
+        error(f"Owner login failed: {resp.status_code} - {resp.text}")
+        return False
+    data = resp.json()
+    OWNER_TOKEN = data["access_token"]
+    success(f"Owner logged in successfully. Token: {OWNER_TOKEN[:20]}...")
+    return True
+
 def get_headers():
     """Get headers with admin token"""
     return {"Authorization": f"Bearer {ADMIN_TOKEN}"}
+
+def get_owner_headers():
+    """Get headers with owner token"""
+    return {"Authorization": f"Bearer {OWNER_TOKEN}"}
 
 def test_product_cost_price():
     """Test 1: Product cost_price + profit fields"""
@@ -921,49 +942,488 @@ def cleanup_test_products():
     log("Note: Orders referencing deleted products will have product_id=NULL (expected behavior)")
     return True
 
+def test_sales_report_login():
+    """Test 10: Sales Report - Login endpoints"""
+    log("\n=== TEST 10: Sales Report - Login ===")
+    
+    # Test owner login
+    log("Testing POST /api/admin/login with owner credentials...")
+    resp = requests.post(f"{BASE_URL}/admin/login", json={
+        "username": "owner",
+        "password": "owner123"
+    })
+    if resp.status_code != 200:
+        error(f"Owner login failed: {resp.status_code} - {resp.text}")
+        return False
+    owner_data = resp.json()
+    if "access_token" not in owner_data:
+        error("Owner login response missing access_token")
+        return False
+    success(f"Owner login successful, token: {owner_data['access_token'][:20]}...")
+    
+    # Test admin login
+    log("Testing POST /api/admin/login with admin credentials...")
+    resp = requests.post(f"{BASE_URL}/admin/login", json={
+        "username": "admin",
+        "password": "admin123"
+    })
+    if resp.status_code != 200:
+        error(f"Admin login failed: {resp.status_code} - {resp.text}")
+        return False
+    admin_data = resp.json()
+    if "access_token" not in admin_data:
+        error("Admin login response missing access_token")
+        return False
+    success(f"Admin login successful, token: {admin_data['access_token'][:20]}...")
+    
+    return True
+
+def test_sales_report_basic():
+    """Test 11: Sales Report - Basic GET endpoint"""
+    log("\n=== TEST 11: Sales Report - Basic GET ===")
+    
+    log("Testing GET /api/admin/reports/sales (no params) with OWNER token...")
+    resp = requests.get(f"{BASE_URL}/admin/reports/sales", headers=get_owner_headers())
+    if resp.status_code != 200:
+        error(f"Sales report failed: {resp.status_code} - {resp.text}")
+        return False
+    
+    data = resp.json()
+    log(f"Sales report response keys: {list(data.keys())}")
+    
+    # Verify required fields
+    required_fields = ["start_date", "end_date", "summary", "rows", "daily", "top_products"]
+    for field in required_fields:
+        if field not in data:
+            error(f"Sales report missing field: {field}")
+            return False
+    success("Sales report has all required fields")
+    
+    # Verify summary fields
+    summary = data["summary"]
+    log(f"Summary: {json.dumps(summary, indent=2)}")
+    summary_fields = ["gross_revenue", "total_cost", "net_profit", "margin_pct", "paid_orders", "items_sold", "avg_order_value"]
+    for field in summary_fields:
+        if field not in summary:
+            error(f"Summary missing field: {field}")
+            return False
+    success("Summary has all required fields")
+    
+    # Verify net_profit == gross_revenue - total_cost
+    expected_profit = summary["gross_revenue"] - summary["total_cost"]
+    if abs(summary["net_profit"] - expected_profit) > 0.01:
+        error(f"Net profit calculation wrong: expected {expected_profit}, got {summary['net_profit']}")
+        return False
+    success(f"Net profit calculation correct: {summary['gross_revenue']} - {summary['total_cost']} = {summary['net_profit']}")
+    
+    # Verify paid_orders == len(rows)
+    if summary["paid_orders"] != len(data["rows"]):
+        error(f"Paid orders count mismatch: summary says {summary['paid_orders']}, but rows has {len(data['rows'])}")
+        return False
+    success(f"Paid orders count matches: {summary['paid_orders']} orders")
+    
+    # Verify all rows have payment_status=='paid' OR (payment_method=='cod' and order_status=='selesai')
+    log(f"Verifying {len(data['rows'])} rows...")
+    for i, row in enumerate(data["rows"]):
+        is_paid = row["payment_status"] == "paid"
+        is_cod_selesai = row["payment_method"] == "cod" and row["order_status"] == "selesai"
+        is_cancelled = row["order_status"] == "dibatalkan"
+        
+        if is_cancelled:
+            error(f"Row {i+1} has order_status='dibatalkan', should not be in report")
+            return False
+        
+        if not (is_paid or is_cod_selesai):
+            error(f"Row {i+1} is neither paid nor COD selesai: payment_status={row['payment_status']}, payment_method={row['payment_method']}, order_status={row['order_status']}")
+            return False
+    
+    success(f"All {len(data['rows'])} rows are valid (paid OR COD selesai, not cancelled)")
+    
+    log(f"Report period: {data['start_date']} to {data['end_date']}")
+    log(f"Total revenue: {summary['gross_revenue']}")
+    log(f"Total cost: {summary['total_cost']}")
+    log(f"Net profit: {summary['net_profit']}")
+    log(f"Margin: {summary['margin_pct']}%")
+    
+    return True
+
+def test_sales_report_date_filters():
+    """Test 12: Sales Report - Date filters"""
+    log("\n=== TEST 12: Sales Report - Date filters ===")
+    
+    from datetime import datetime, timedelta
+    
+    # Test with 60 days ago
+    today = datetime.now()
+    start_60d = (today - timedelta(days=60)).strftime("%Y-%m-%d")
+    end_today = today.strftime("%Y-%m-%d")
+    
+    log(f"Testing GET /api/admin/reports/sales?start={start_60d}&end={end_today}...")
+    resp = requests.get(f"{BASE_URL}/admin/reports/sales", 
+                       params={"start": start_60d, "end": end_today},
+                       headers=get_owner_headers())
+    if resp.status_code != 200:
+        error(f"Sales report with date filter failed: {resp.status_code} - {resp.text}")
+        return False
+    
+    data_60d = resp.json()
+    log(f"60-day report: {len(data_60d['rows'])} orders, revenue={data_60d['summary']['gross_revenue']}")
+    
+    # Test with default (current month)
+    resp = requests.get(f"{BASE_URL}/admin/reports/sales", headers=get_owner_headers())
+    data_month = resp.json()
+    log(f"Current month report: {len(data_month['rows'])} orders, revenue={data_month['summary']['gross_revenue']}")
+    
+    # 60-day should have >= current month orders (sample data has 8 in 60d, 6 in current month)
+    if len(data_60d['rows']) < len(data_month['rows']):
+        error(f"60-day report should have >= current month orders, got {len(data_60d['rows'])} vs {len(data_month['rows'])}")
+        return False
+    success(f"60-day report has more/equal orders than current month: {len(data_60d['rows'])} >= {len(data_month['rows'])}")
+    
+    # Test with empty period (2020)
+    log("Testing GET /api/admin/reports/sales?start=2020-01-01&end=2020-01-31...")
+    resp = requests.get(f"{BASE_URL}/admin/reports/sales",
+                       params={"start": "2020-01-01", "end": "2020-01-31"},
+                       headers=get_owner_headers())
+    if resp.status_code != 200:
+        error(f"Empty period report failed: {resp.status_code} - {resp.text}")
+        return False
+    
+    data_empty = resp.json()
+    log(f"Empty period report: {len(data_empty['rows'])} orders, revenue={data_empty['summary']['gross_revenue']}")
+    
+    if len(data_empty['rows']) != 0:
+        error(f"Empty period should have 0 orders, got {len(data_empty['rows'])}")
+        return False
+    if data_empty['summary']['gross_revenue'] != 0:
+        error(f"Empty period should have 0 revenue, got {data_empty['summary']['gross_revenue']}")
+        return False
+    success("Empty period (2020) returns 0 rows and zero summary")
+    
+    return True
+
+def test_sales_report_rbac():
+    """Test 13: Sales Report - RBAC (403 for admin, 401 without token)"""
+    log("\n=== TEST 13: Sales Report - RBAC ===")
+    
+    # Test with ADMIN token (should be 403)
+    log("Testing GET /api/admin/reports/sales with ADMIN (non-owner) token (should be 403)...")
+    resp = requests.get(f"{BASE_URL}/admin/reports/sales", headers=get_headers())
+    if resp.status_code != 403:
+        error(f"Expected 403 for admin token, got {resp.status_code}")
+        return False
+    success("Admin (non-owner) token correctly rejected with 403")
+    
+    # Test without token (should be 401)
+    log("Testing GET /api/admin/reports/sales without token (should be 401)...")
+    resp = requests.get(f"{BASE_URL}/admin/reports/sales")
+    if resp.status_code != 401:
+        error(f"Expected 401 for no token, got {resp.status_code}")
+        return False
+    success("No token correctly rejected with 401")
+    
+    # Test export.xlsx with admin token (should be 403)
+    log("Testing GET /api/admin/reports/sales/export.xlsx with ADMIN token (should be 403)...")
+    resp = requests.get(f"{BASE_URL}/admin/reports/sales/export.xlsx", headers=get_headers())
+    if resp.status_code != 403:
+        error(f"Expected 403 for admin token on export.xlsx, got {resp.status_code}")
+        return False
+    success("Admin token on export.xlsx correctly rejected with 403")
+    
+    # Test export.pdf without token (should be 401)
+    log("Testing GET /api/admin/reports/sales/export.pdf without token (should be 401)...")
+    resp = requests.get(f"{BASE_URL}/admin/reports/sales/export.pdf")
+    if resp.status_code != 401:
+        error(f"Expected 401 for no token on export.pdf, got {resp.status_code}")
+        return False
+    success("No token on export.pdf correctly rejected with 401")
+    
+    return True
+
+def test_sales_report_validation():
+    """Test 14: Sales Report - Validation (start > end, invalid dates)"""
+    log("\n=== TEST 14: Sales Report - Validation ===")
+    
+    # Test start > end (should be 400)
+    log("Testing GET /api/admin/reports/sales?start=2024-12-31&end=2024-01-01 (start > end, should be 400)...")
+    resp = requests.get(f"{BASE_URL}/admin/reports/sales",
+                       params={"start": "2024-12-31", "end": "2024-01-01"},
+                       headers=get_owner_headers())
+    if resp.status_code != 400:
+        error(f"Expected 400 for start > end, got {resp.status_code}")
+        return False
+    
+    # Check for Indonesian error message
+    error_data = resp.json()
+    if "detail" in error_data:
+        log(f"Error message: {error_data['detail']}")
+        if "tanggal" not in error_data["detail"].lower():
+            error("Error message should be in Indonesian (contain 'tanggal')")
+            return False
+    success("start > end correctly rejected with 400 and Indonesian message")
+    
+    # Test invalid date format (should be 400)
+    log("Testing GET /api/admin/reports/sales?start=abc&end=2024-12-31 (invalid date, should be 400)...")
+    resp = requests.get(f"{BASE_URL}/admin/reports/sales",
+                       params={"start": "abc", "end": "2024-12-31"},
+                       headers=get_owner_headers())
+    if resp.status_code != 400:
+        error(f"Expected 400 for invalid date, got {resp.status_code}")
+        return False
+    success("Invalid date format correctly rejected with 400")
+    
+    return True
+
+def test_sales_report_export_xlsx():
+    """Test 15: Sales Report - Export Excel"""
+    log("\n=== TEST 15: Sales Report - Export Excel ===")
+    
+    from datetime import datetime, timedelta
+    
+    today = datetime.now()
+    start = (today - timedelta(days=30)).strftime("%Y-%m-%d")
+    end = today.strftime("%Y-%m-%d")
+    
+    log(f"Testing GET /api/admin/reports/sales/export.xlsx?start={start}&end={end}...")
+    resp = requests.get(f"{BASE_URL}/admin/reports/sales/export.xlsx",
+                       params={"start": start, "end": end},
+                       headers=get_owner_headers(),
+                       timeout=30)
+    
+    if resp.status_code != 200:
+        error(f"Excel export failed: {resp.status_code} - {resp.text}")
+        return False
+    
+    # Check content-type
+    content_type = resp.headers.get("content-type", "")
+    log(f"Content-Type: {content_type}")
+    if "spreadsheetml" not in content_type:
+        error(f"Expected spreadsheetml content-type, got {content_type}")
+        return False
+    success("Content-Type is correct (spreadsheetml)")
+    
+    # Check Content-Disposition
+    content_disp = resp.headers.get("content-disposition", "")
+    log(f"Content-Disposition: {content_disp}")
+    if "attachment" not in content_disp:
+        error(f"Expected attachment in Content-Disposition, got {content_disp}")
+        return False
+    if f"Laporan-Penjualan-Semoyo-Joyo_{start}_{end}.xlsx" not in content_disp:
+        error(f"Filename should contain Laporan-Penjualan-Semoyo-Joyo_{start}_{end}.xlsx")
+        return False
+    success(f"Content-Disposition correct with filename")
+    
+    # Check body starts with PK (ZIP signature for xlsx)
+    if not resp.content.startswith(b'PK'):
+        error("Excel file should start with 'PK' (ZIP signature)")
+        return False
+    success("Excel file has valid ZIP signature (PK)")
+    
+    # Try to parse with openpyxl if available
+    try:
+        from openpyxl import load_workbook
+        import io
+        wb = load_workbook(io.BytesIO(resp.content))
+        sheet_names = wb.sheetnames
+        log(f"Excel sheet names: {sheet_names}")
+        
+        expected_sheets = ["Ringkasan", "Detail Pesanan", "Produk Terjual"]
+        for sheet in expected_sheets:
+            if sheet not in sheet_names:
+                error(f"Missing sheet: {sheet}")
+                return False
+        success(f"Excel has all expected sheets: {expected_sheets}")
+        
+        # Check Detail Pesanan header row 4
+        ws = wb["Detail Pesanan"]
+        header_row = 4
+        headers = [cell.value for cell in ws[header_row]]
+        log(f"Detail Pesanan headers (row {header_row}): {headers}")
+        
+        expected_headers = ["No. Pesanan", "Nama Pembeli", "Total Penjualan", "Laba"]
+        for h in expected_headers:
+            if h not in headers:
+                error(f"Missing header in Detail Pesanan: {h}")
+                return False
+        success(f"Detail Pesanan has all expected headers")
+        
+    except ImportError:
+        log("openpyxl not available, skipping detailed Excel validation")
+    except Exception as e:
+        error(f"Failed to parse Excel: {e}")
+        return False
+    
+    return True
+
+def test_sales_report_export_pdf():
+    """Test 16: Sales Report - Export PDF"""
+    log("\n=== TEST 16: Sales Report - Export PDF ===")
+    
+    from datetime import datetime, timedelta
+    
+    today = datetime.now()
+    start = (today - timedelta(days=30)).strftime("%Y-%m-%d")
+    end = today.strftime("%Y-%m-%d")
+    
+    log(f"Testing GET /api/admin/reports/sales/export.pdf?start={start}&end={end}...")
+    resp = requests.get(f"{BASE_URL}/admin/reports/sales/export.pdf",
+                       params={"start": start, "end": end},
+                       headers=get_owner_headers(),
+                       timeout=30)
+    
+    if resp.status_code != 200:
+        error(f"PDF export failed: {resp.status_code} - {resp.text}")
+        return False
+    
+    # Check content-type
+    content_type = resp.headers.get("content-type", "")
+    log(f"Content-Type: {content_type}")
+    if "application/pdf" not in content_type:
+        error(f"Expected application/pdf content-type, got {content_type}")
+        return False
+    success("Content-Type is correct (application/pdf)")
+    
+    # Check Content-Disposition
+    content_disp = resp.headers.get("content-disposition", "")
+    log(f"Content-Disposition: {content_disp}")
+    if ".pdf" not in content_disp:
+        error(f"Filename should contain .pdf")
+        return False
+    success("Content-Disposition filename contains .pdf")
+    
+    # Check body starts with %PDF
+    if not resp.content.startswith(b'%PDF'):
+        error("PDF file should start with '%PDF'")
+        return False
+    success("PDF file has valid signature (%PDF)")
+    
+    # Test empty period (2020) - should still return valid PDF
+    log("Testing PDF export with empty period (2020)...")
+    resp = requests.get(f"{BASE_URL}/admin/reports/sales/export.pdf",
+                       params={"start": "2020-01-01", "end": "2020-01-31"},
+                       headers=get_owner_headers(),
+                       timeout=30)
+    
+    if resp.status_code != 200:
+        error(f"Empty period PDF export failed: {resp.status_code}")
+        return False
+    if not resp.content.startswith(b'%PDF'):
+        error("Empty period PDF should still be valid")
+        return False
+    success("Empty period (2020) returns valid PDF with 200")
+    
+    return True
+
+def test_sales_report_audit_logs():
+    """Test 17: Sales Report - Audit logs after exports"""
+    log("\n=== TEST 17: Sales Report - Audit logs ===")
+    
+    from datetime import datetime, timedelta
+    
+    today = datetime.now()
+    start = (today - timedelta(days=7)).strftime("%Y-%m-%d")
+    end = today.strftime("%Y-%m-%d")
+    
+    # Do an export first
+    log("Exporting Excel to generate audit log...")
+    resp = requests.get(f"{BASE_URL}/admin/reports/sales/export.xlsx",
+                       params={"start": start, "end": end},
+                       headers=get_owner_headers(),
+                       timeout=30)
+    if resp.status_code != 200:
+        error(f"Excel export failed: {resp.status_code}")
+        return False
+    
+    # Check audit logs
+    log("Testing GET /api/admin/audit-logs?action=export...")
+    resp = requests.get(f"{BASE_URL}/admin/audit-logs",
+                       params={"action": "export"},
+                       headers=get_owner_headers())
+    
+    if resp.status_code != 200:
+        error(f"Audit logs failed: {resp.status_code} - {resp.text}")
+        return False
+    
+    logs = resp.json()
+    log(f"Found {len(logs)} export audit logs")
+    
+    # Find report export logs
+    report_logs = [l for l in logs if l.get("entity_type") == "report"]
+    log(f"Found {len(report_logs)} report export logs")
+    
+    if len(report_logs) == 0:
+        error("No report export logs found with entity_type='report'")
+        return False
+    
+    # Check the most recent one
+    latest = report_logs[0]
+    log(f"Latest report export log:")
+    log(f"  - action: {latest.get('action')}")
+    log(f"  - entity_type: {latest.get('entity_type')}")
+    log(f"  - entity_label: {latest.get('entity_label')}")
+    log(f"  - description: {latest.get('description')}")
+    
+    if latest.get("action") != "export":
+        error(f"Expected action='export', got {latest.get('action')}")
+        return False
+    if latest.get("entity_type") != "report":
+        error(f"Expected entity_type='report', got {latest.get('entity_type')}")
+        return False
+    
+    success("Audit log correctly recorded report export with entity_type='report'")
+    
+    return True
+
 def main():
     """Main test runner"""
     print("\n" + "="*80)
-    print("BACKEND API TESTING - Semoyo Joyo B2B App (Tahap 2)")
+    print("BACKEND API TESTING - Semoyo Joyo B2B App - Sales Report Feature")
     print("="*80 + "\n")
     
-    # Login
+    # Login as both admin and owner
     if not admin_login():
         error("Failed to login as admin. Aborting tests.")
         return
     
-    # Test 8: Auth (can run without other tests)
-    test_auth()
-    
-    # Test 1: Product cost_price + profit fields
-    product_id = test_product_cost_price()
-    if not product_id:
-        error("Test 1 failed. Aborting remaining tests.")
+    if not owner_login():
+        error("Failed to login as owner. Aborting tests.")
         return
     
-    # Test 3: Stock endpoints
-    if not test_stock_endpoints(product_id):
-        error("Test 3 failed. Continuing with other tests...")
+    # Test 10: Sales Report - Login
+    if not test_sales_report_login():
+        error("Test 10 failed. Continuing...")
     
-    # Test 4: Checkout flow
-    order_id = test_checkout_flow(product_id)
-    if not order_id:
-        error("Test 4 failed. Aborting dashboard test.")
+    # Test 11: Sales Report - Basic GET
+    if not test_sales_report_basic():
+        error("Test 11 failed. Aborting remaining sales report tests.")
         return
     
-    # Test 2: Dashboard (after checkout)
-    if not test_dashboard(order_id):
-        error("Test 2 failed. Continuing with other tests...")
+    # Test 12: Sales Report - Date filters
+    if not test_sales_report_date_filters():
+        error("Test 12 failed. Continuing...")
     
-    # Test 6 & 7: Order edit and delete
-    if not test_order_edit_delete(product_id):
-        error("Test 6 & 7 failed.")
+    # Test 13: Sales Report - RBAC
+    if not test_sales_report_rbac():
+        error("Test 13 failed. Continuing...")
     
-    # Test 9: Cleanup
-    cleanup_test_products()
+    # Test 14: Sales Report - Validation
+    if not test_sales_report_validation():
+        error("Test 14 failed. Continuing...")
+    
+    # Test 15: Sales Report - Export Excel
+    if not test_sales_report_export_xlsx():
+        error("Test 15 failed. Continuing...")
+    
+    # Test 16: Sales Report - Export PDF
+    if not test_sales_report_export_pdf():
+        error("Test 16 failed. Continuing...")
+    
+    # Test 17: Sales Report - Audit logs
+    if not test_sales_report_audit_logs():
+        error("Test 17 failed. Continuing...")
     
     print("\n" + "="*80)
-    print("ALL TESTS COMPLETED")
+    print("ALL SALES REPORT TESTS COMPLETED")
     print("="*80 + "\n")
 
 if __name__ == "__main__":

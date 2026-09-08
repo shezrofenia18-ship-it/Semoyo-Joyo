@@ -20,6 +20,7 @@ import AdminCategoriesPage from "@/pages/admin/AdminCategoriesPage";
 import AdminOrdersPage from "@/pages/admin/AdminOrdersPage";
 import AdminStockPage from "@/pages/admin/AdminStockPage";
 import AdminAuditLogPage from "@/pages/admin/AdminAuditLogPage";
+import AdminReportsPage from "@/pages/admin/AdminReportsPage";
 
 function App() {
   return (
@@ -46,6 +47,7 @@ function App() {
                 <Route path="pesanan" element={<AdminOrdersPage />} />
                 <Route path="stok" element={<AdminStockPage />} />
                 <Route path="audit-log" element={<AdminAuditLogPage />} />
+                <Route path="laporan" element={<AdminReportsPage />} />
               </Route>
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

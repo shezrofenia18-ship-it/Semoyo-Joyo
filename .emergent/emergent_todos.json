@@ -1,38 +1,26 @@
 [
   {
-    "content": "Phase 1: PostgreSQL install + running (done), add DATABASE_URL, ensure_postgres.sh self-healing",
+    "content": "Backend: routers/reports.py - GET /admin/reports/sales (owner only, date range, summary + rows)",
     "status": "completed"
   },
   {
-    "content": "Phase 1: db.py + models + test_core.py roundtrip POC pass",
+    "content": "Backend: Excel export (.xlsx via openpyxl) with header, sheet names, summary",
     "status": "completed"
   },
   {
-    "content": "Get Midtrans integration playbook (sandbox structure)",
+    "content": "Backend: PDF export (reportlab) with Semoyo Joyo logo/kop, print-ready",
     "status": "completed"
   },
   {
-    "content": "Phase 2: Design guidelines via design_agent",
+    "content": "Frontend: AdminReportsPage (/admin/laporan) - filter periode, ringkasan, tabel sortable, tombol Excel/PDF; nav owner-only",
     "status": "completed"
   },
   {
-    "content": "Phase 2: Backend full implementation (routers, auth, checkout, payments, admin, seed)",
+    "content": "Seed sample paid orders for verification; update requirements.txt",
     "status": "completed"
   },
   {
-    "content": "Phase 2: Frontend full implementation (Beranda, Keranjang, Checkout, Pembayaran, Pesanan, Admin)",
-    "status": "completed"
-  },
-  {
-    "content": "Phase 2: Docker/Coolify files (Dockerfiles, docker-compose, README-DEPLOY)",
-    "status": "completed"
-  },
-  {
-    "content": "Phase 2: All user stories covered in development",
-    "status": "completed"
-  },
-  {
-    "content": "Phase 2: End to End Testing using Testing Agent + fix all issues",
+    "content": "Testing agent: end-to-end test of Laporan feature (API + UI + downloads)",
     "status": "completed"
   }
 ]

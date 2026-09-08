@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Search, ScrollText, ShieldCheck, UserCog, LogIn, Plus, Pencil, Trash2, Boxes, RefreshCw } from "lucide-react";
+import { Search, ScrollText, ShieldCheck, UserCog, LogIn, Plus, Pencil, Trash2, Boxes, RefreshCw, Download } from "lucide-react";
 import { toast } from "sonner";
 import { api, errorMessage } from "@/lib/api";
 import { useAdminGuard } from "@/hooks/useAdminGuard";
@@ -22,8 +22,9 @@ const ACTION = {
   status: { label: "Status", icon: RefreshCw, cls: "bg-indigo-50 text-indigo-800 border-indigo-200" },
   stock_adjust: { label: "Stok", icon: Boxes, cls: "bg-amber-50 text-amber-800 border-amber-200" },
   delete: { label: "Hapus", icon: Trash2, cls: "bg-rose-50 text-rose-800 border-rose-200" },
+  export: { label: "Unduh Laporan", icon: Download, cls: "bg-violet-50 text-violet-800 border-violet-200" },
 };
-const ENTITY = { auth: "Autentikasi", product: "Produk", category: "Kategori", order: "Pesanan", stock: "Stok" };
+const ENTITY = { auth: "Autentikasi", product: "Produk", category: "Kategori", order: "Pesanan", stock: "Stok", report: "Laporan" };
 
 export default function AdminAuditLogPage() {
   const guard = useAdminGuard();

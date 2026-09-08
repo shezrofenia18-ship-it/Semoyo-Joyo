@@ -21,7 +21,7 @@ from starlette.middleware.cors import CORSMiddleware  # noqa: E402
 from database import AsyncSessionLocal, Base, engine, ensure_local_postgres, get_db  # noqa: E402
 import models  # noqa: E402,F401  (register tables)
 from payments.midtrans import midtrans  # noqa: E402
-from routers import admin, catalog, customer, payments  # noqa: E402
+from routers import admin, catalog, customer, payments, reports  # noqa: E402
 from seed import seed_if_empty  # noqa: E402
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -94,6 +94,7 @@ api_router.include_router(catalog.router)
 api_router.include_router(customer.router)
 api_router.include_router(payments.router)
 api_router.include_router(admin.router)
+api_router.include_router(reports.router)
 app.include_router(api_router)
 
 UPLOAD_DIR = ROOT_DIR / "uploads"
@@ -106,4 +107,5 @@ app.add_middleware(
     allow_origins=os.environ.get("CORS_ORIGINS", "*").split(","),
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["Content-Disposition"],
 )
