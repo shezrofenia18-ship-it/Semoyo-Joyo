@@ -83,8 +83,8 @@ export const Navbar = () => {
                 <DropdownMenuItem onClick={() => navigate("/pesanan")} data-testid="menu-orders">
                   <ClipboardList className="mr-2 h-4 w-4" /> Riwayat Pesanan
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => navigate("/admin")}>
-                  <ShieldCheck className="mr-2 h-4 w-4" /> Area Admin
+                <DropdownMenuItem onClick={() => navigate("/admin")} data-testid="menu-admin-portal">
+                  <ShieldCheck className="mr-2 h-4 w-4" /> Portal Admin
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={logoutCustomer} data-testid="customer-logout">
@@ -93,13 +93,30 @@ export const Navbar = () => {
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
-            <Link to="/masuk" data-testid="customer-login-link">
-              <Button variant="ghost" size="sm" className="gap-2">
-                <UserRound className="h-4 w-4" />
-                <span className="hidden sm:inline">Masuk</span>
-              </Button>
-            </Link>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="gap-2" data-testid="account-menu-button">
+                  <UserRound className="h-4 w-4" />
+                  <span className="hidden sm:inline">Masuk</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuItem onClick={() => navigate("/masuk")} data-testid="customer-login-link">
+                  <UserRound className="mr-2 h-4 w-4" /> Masuk Pelanggan
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => navigate("/admin")} data-testid="menu-admin-portal">
+                  <ShieldCheck className="mr-2 h-4 w-4" /> Portal Admin (Owner)
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
+
+          <Link to="/admin" className="hidden lg:block" data-testid="nav-admin-portal-link">
+            <Button variant="outline" size="sm" className="gap-2 border-primary/40 text-primary hover:bg-accent" aria-label="Portal Admin">
+              <ShieldCheck className="h-4 w-4" /> Portal Admin
+            </Button>
+          </Link>
 
           <Button
             data-testid="open-cart-button"
