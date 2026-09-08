@@ -80,3 +80,7 @@ memory/test_credentials.md
 
 # Mobile development
 android-sdk/
+# Local dev PostgreSQL data (never commit)
+pgdata/
+pglog/
+backend/uploads/

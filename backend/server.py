@@ -28,13 +28,29 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(level
 logger = logging.getLogger("mbg")
 
 
+async def _init_db_with_retry(attempts: int = 8) -> None:
+    """Start local PG (dev), create tables, seed. Retries so a slow DB boot never kills the API."""
+    import asyncio
+
+    last_exc: Exception | None = None
+    for i in range(1, attempts + 1):
+        try:
+            ensure_local_postgres()
+            async with engine.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
+            async with AsyncSessionLocal() as session:
+                await seed_if_empty(session)
+            return
+        except Exception as exc:  # noqa: BLE001
+            last_exc = exc
+            logger.warning("DB init attempt %s/%s failed: %s", i, attempts, str(exc).splitlines()[-1][:200])
+            await asyncio.sleep(min(2 * i, 10))
+    raise RuntimeError(f"Database tidak dapat dihubungi setelah {attempts} percobaan: {last_exc}")
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    ensure_local_postgres()
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    async with AsyncSessionLocal() as session:
-        await seed_if_empty(session)
+    await _init_db_with_retry()
     logger.info("MBG backend ready. Payment mode: %s", midtrans.mode)
     yield
     await engine.dispose()

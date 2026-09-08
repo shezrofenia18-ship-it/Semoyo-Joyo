@@ -123,3 +123,5 @@
   - Deploy: backend/Dockerfile, frontend/Dockerfile + nginx.conf, docker-compose.yml, .env.example, README-DEPLOY.md.
 - Kredensial dev: admin/admin123 (backend/.env). Mode pembayaran: simulation.
 - [ ] Phase 3 (berikutnya, sesuai permintaan user): ERP mini lanjutan (stok masuk/keluar, pembelian ke supplier, laporan), ongkir, notifikasi WA, aktivasi Midtrans dengan key asli, invoice PDF.
+
+- [x] BUGFIX (pod restart): binary PostgreSQL dibundel di /root/pg15 (persisten), ensure_postgres.sh pakai bundle tanpa apt, lifespan retry DB init. Verified via testing agent (iteration_2, 100%).
