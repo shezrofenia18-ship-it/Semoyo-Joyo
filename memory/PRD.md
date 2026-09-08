@@ -41,5 +41,11 @@ Brand: Biru #0B4EA2 (primary), Kuning #F5C400 (aksen), Putih. Logo: frontend/pub
 - Definisi terjual = paid ATAU (COD & selesai), tidak dibatalkan, berdasarkan tanggal pesanan (konsisten dengan dashboard)
 - Script contoh data: backend/scripts/seed_sample_orders.py (10 pesanan via API asli, sebagian backdated)
 
+## Katalog Produk Asli (SELESAI)
+- 58 produk asli pemilik di-seed via `backend/scripts/seed_real_products.py` (idempotent upsert by slug; `--keep-old` untuk tidak menonaktifkan dummy; `--no-verify-images` skip cek URL).
+- Pemetaan ke 7 kategori existing; deskripsi B2B; harga jual acak +-8% dari acuan pasar, modal 78-82% (margin ~20%); stok 1000; min order per satuan.
+- Gambar: Unsplash direct URL, tiap URL diverifikasi HTTP saat seeding; relevansi dicek visual (45 foto unik). 33 produk dummy lama dinonaktifkan (is_active=false, bisa diaktifkan lagi via Admin > Produk).
+- Catatan: "Kenot" dipetakan ke Sayuran Segar (asumsi wortel impor/baby carrot) - konfirmasi pemilik.
+
 ## Backlog
 - Pembelian ke supplier (PO), laporan penjualan periode, ongkir, notifikasi WA, invoice PDF, Midtrans production
