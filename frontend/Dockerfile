@@ -3,7 +3,7 @@ FROM node:20-alpine AS build
 WORKDIR /app
 
 COPY package.json ./
-RUN npm install --frozen-lockfile --network-timeout 600000
+RUN RUN npm install --legacy-peer-deps --network-timeout 600000
 
 COPY . .
 # Backend URL embedded at build time. In Coolify set build arg REACT_APP_BACKEND_URL
