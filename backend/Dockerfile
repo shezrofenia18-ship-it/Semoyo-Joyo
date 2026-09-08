@@ -10,7 +10,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends build-essential
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt--use-pep517
+RUN pip install --no-cache-dir fastapi uvicorn sqlalchemy asyncpg pydantic
 
 COPY . .
 RUN mkdir -p /app/uploads
