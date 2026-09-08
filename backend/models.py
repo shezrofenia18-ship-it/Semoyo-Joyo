@@ -34,7 +34,7 @@ class User(Base):
     username: Mapped[str] = mapped_column(String(150), unique=True, index=True, nullable=False)
     phone: Mapped[str | None] = mapped_column(String(30))
     address: Mapped[str | None] = mapped_column(Text)
-    role: Mapped[str] = mapped_column(String(20), default="customer", nullable=False)  # customer | admin
+    role: Mapped[str] = mapped_column(String(20), default="customer", nullable=False)  # customer | admin | owner
     password_hash: Mapped[str | None] = mapped_column(String(255))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
@@ -66,6 +66,7 @@ class Product(Base):
     slug: Mapped[str] = mapped_column(String(220), unique=True, index=True, nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
     price: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False, default=0)
+    cost_price: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False, default=0, server_default="0")  # harga beli / modal
     unit: Mapped[str] = mapped_column(String(30), nullable=False, default="kg")
     min_order: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     stock: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
@@ -75,6 +76,28 @@ class Product(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
     category: Mapped["Category"] = relationship(back_populates="products")
+    stock_movements: Mapped[list["StockMovement"]] = relationship(back_populates="product", cascade="all, delete-orphan")
+
+
+class StockMovement(Base):
+    """Riwayat mutasi stok (masuk / keluar / penyesuaian manual / pesanan)."""
+
+    __tablename__ = "stock_movements"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=gen_uuid)
+    product_id: Mapped[str] = mapped_column(String(36), ForeignKey("products.id", ondelete="CASCADE"), index=True, nullable=False)
+    product_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    movement_type: Mapped[str] = mapped_column(String(20), nullable=False)  # in | out | adjust
+    qty: Mapped[int] = mapped_column(Integer, nullable=False)  # positif = bertambah, negatif = berkurang
+    stock_before: Mapped[int] = mapped_column(Integer, nullable=False)
+    stock_after: Mapped[int] = mapped_column(Integer, nullable=False)
+    note: Mapped[str | None] = mapped_column(Text)
+    reference: Mapped[str | None] = mapped_column(String(120))  # mis. nomor pesanan
+    source: Mapped[str] = mapped_column(String(20), nullable=False, default="manual")  # manual | order | cancel
+    created_by: Mapped[str | None] = mapped_column(String(150))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    product: Mapped["Product"] = relationship(back_populates="stock_movements")
 
 
 class Order(Base):
@@ -115,10 +138,29 @@ class OrderItem(Base):
     image_url: Mapped[str | None] = mapped_column(Text)
     unit: Mapped[str] = mapped_column(String(30), nullable=False)
     price: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    cost_price: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))  # snapshot modal saat pesanan dibuat
     qty: Mapped[int] = mapped_column(Integer, nullable=False)
     subtotal: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
 
     order: Mapped["Order"] = relationship(back_populates="items")
+
+
+class AuditLog(Base):
+    """Jejak audit aktivitas akun admin/owner (dipantau oleh Owner)."""
+
+    __tablename__ = "audit_logs"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=gen_uuid)
+    actor_id: Mapped[str | None] = mapped_column(String(36), index=True)
+    actor_username: Mapped[str] = mapped_column(String(150), nullable=False)
+    actor_role: Mapped[str] = mapped_column(String(20), nullable=False)
+    action: Mapped[str] = mapped_column(String(40), nullable=False, index=True)  # login|create|update|delete|stock_adjust|status
+    entity_type: Mapped[str] = mapped_column(String(40), nullable=False, index=True)  # product|category|order|stock|auth
+    entity_id: Mapped[str | None] = mapped_column(String(64))
+    entity_label: Mapped[str | None] = mapped_column(String(200))
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    meta: Mapped[dict | None] = mapped_column(JSONB)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
 
 
 class PaymentTransaction(Base):

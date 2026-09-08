@@ -21,30 +21,33 @@ code {
 
 @layer base {
     :root {
-        --background: 36 33% 98%;
-        --foreground: 222 22% 12%;
+        /* Semoyo Joyo brand: Biru #0B4EA2, Kuning #F5C400, Putih */
+        --background: 0 0% 100%;
+        --foreground: 217 45% 14%;
         --card: 0 0% 100%;
-        --card-foreground: 222 22% 12%;
+        --card-foreground: 217 45% 14%;
         --popover: 0 0% 100%;
-        --popover-foreground: 222 22% 12%;
-        --primary: 164 42% 28%;
-        --primary-foreground: 0 0% 98%;
-        --secondary: 36 20% 94%;
-        --secondary-foreground: 222 22% 14%;
-        --muted: 36 18% 95%;
-        --muted-foreground: 215 14% 42%;
-        --accent: 164 35% 92%;
-        --accent-foreground: 164 42% 18%;
+        --popover-foreground: 217 45% 14%;
+        --primary: 213 87% 34%;
+        --primary-foreground: 0 0% 100%;
+        --secondary: 214 60% 96%;
+        --secondary-foreground: 217 45% 16%;
+        --muted: 214 30% 96%;
+        --muted-foreground: 215 18% 42%;
+        --accent: 48 100% 92%;
+        --accent-foreground: 40 90% 18%;
+        --brand-yellow: 48 100% 48%;
+        --brand-yellow-foreground: 217 45% 14%;
         --destructive: 0 72% 52%;
         --destructive-foreground: 0 0% 98%;
-        --border: 30 12% 88%;
-        --input: 30 12% 88%;
-        --ring: 164 42% 28%;
-        --chart-1: 164 42% 28%;
-        --chart-2: 205 55% 38%;
-        --chart-3: 28 78% 55%;
-        --chart-4: 43 74% 56%;
-        --chart-5: 222 22% 22%;
+        --border: 214 25% 88%;
+        --input: 214 25% 88%;
+        --ring: 213 87% 34%;
+        --chart-1: 213 87% 34%;
+        --chart-2: 48 100% 48%;
+        --chart-3: 205 55% 55%;
+        --chart-4: 40 90% 60%;
+        --chart-5: 217 45% 22%;
         --radius: 0.75rem;
     }
 }
@@ -61,6 +64,15 @@ code {
     }
 }
 
+@media print {
+    @page { size: A4; margin: 12mm; }
+    body { background: #fff !important; }
+    .no-print, header.sticky, footer, [data-testid="floating-cart-button"], [data-sonner-toaster] { display: none !important; }
+    main { padding: 0 !important; }
+    .receipt { border: 0 !important; box-shadow: none !important; padding: 0 !important; border-radius: 0 !important; }
+    * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+
 .no-scrollbar::-webkit-scrollbar {
     display: none;
 }
@@ -71,8 +83,8 @@ code {
 
 .hero-gradient {
     background-image:
-        radial-gradient(60% 60% at 20% 10%, hsl(164 35% 92%) 0%, transparent 60%),
-        radial-gradient(50% 50% at 80% 0%, hsl(43 74% 92%) 0%, transparent 55%);
+        radial-gradient(60% 60% at 20% 10%, hsl(213 80% 93%) 0%, transparent 60%),
+        radial-gradient(50% 50% at 80% 0%, hsl(48 100% 90%) 0%, transparent 55%);
 }
 
 .noise-bg {

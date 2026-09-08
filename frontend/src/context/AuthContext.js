@@ -62,9 +62,26 @@ export function AuthProvider({ children }) {
     setAdmin(null);
   }, []);
 
+  const refreshAdmin = useCallback(async () => {
+    if (!localStorage.getItem(ADMIN_TOKEN_KEY)) return null;
+    try {
+      const { data } = await api.get("/admin/me");
+      localStorage.setItem(ADMIN_USER_KEY, JSON.stringify(data));
+      setAdmin(data);
+      return data;
+    } catch {
+      return null;
+    }
+  }, []);
+
   const value = useMemo(
-    () => ({ user, admin, checking, loginCustomer, logoutCustomer, loginAdmin, logoutAdmin, isAdminLoggedIn: !!localStorage.getItem(ADMIN_TOKEN_KEY) }),
-    [user, admin, checking, loginCustomer, logoutCustomer, loginAdmin, logoutAdmin]
+    () => ({
+      user, admin, checking, loginCustomer, logoutCustomer, loginAdmin, logoutAdmin, refreshAdmin,
+      isAdminLoggedIn: !!localStorage.getItem(ADMIN_TOKEN_KEY),
+      isOwner: admin?.role === "owner",
+      adminRole: admin?.role || null,
+    }),
+    [user, admin, checking, loginCustomer, logoutCustomer, loginAdmin, logoutAdmin, refreshAdmin]
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

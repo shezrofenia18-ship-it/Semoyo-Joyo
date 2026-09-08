@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { CheckCircle2, Copy, Loader2, RefreshCw, Truck, Landmark, QrCode, Wallet, AlertTriangle, ExternalLink, FlaskConical, ClipboardList } from "lucide-react";
+import { CheckCircle2, Copy, Loader2, RefreshCw, Truck, Landmark, QrCode, Wallet, AlertTriangle, ExternalLink, FlaskConical, ClipboardList, Receipt } from "lucide-react";
 import { toast } from "sonner";
 import { api, errorMessage } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -143,9 +143,12 @@ export default function PaymentPage() {
           <h1 className="font-display text-2xl font-semibold sm:text-3xl" data-testid="payment-order-number">{order.order_number}</h1>
           <p className="mt-1 text-sm text-muted-foreground">Dibuat {formatDate(order.created_at)}</p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <PaymentStatusBadge status={order.payment_status} data-testid="payment-status-badge" className="px-3 py-1 text-sm" />
           <OrderStatusBadge status={order.order_status} data-testid="order-status-badge" className="px-3 py-1 text-sm" />
+          <Button variant="outline" size="sm" className="gap-2 border-primary/40 text-primary" onClick={() => navigate(`/struk/${order.order_number}`)} data-testid="payment-receipt-button">
+            <Receipt className="h-4 w-4" /> Struk / PDF
+          </Button>
         </div>
       </div>
 

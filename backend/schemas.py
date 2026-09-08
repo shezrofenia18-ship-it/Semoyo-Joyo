@@ -33,6 +33,9 @@ class ProductOut(ORMModel):
     slug: str
     description: Optional[str] = None
     price: float
+    cost_price: float = 0
+    profit_per_unit: float = 0
+    margin_pct: float = 0
     unit: str
     min_order: int
     stock: int
@@ -104,6 +107,7 @@ class OrderItemOut(ORMModel):
     image_url: Optional[str] = None
     unit: str
     price: float
+    cost_price: Optional[float] = None
     qty: int
     subtotal: float
 
@@ -169,6 +173,7 @@ class ProductIn(BaseModel):
     name: str = Field(min_length=2, max_length=200)
     description: Optional[str] = None
     price: float = Field(ge=0)
+    cost_price: float = Field(ge=0, default=0)
     unit: str = Field(min_length=1, max_length=30)
     min_order: int = Field(ge=1, default=1)
     stock: int = Field(ge=0, default=0)
@@ -181,6 +186,93 @@ class OrderStatusUpdateIn(BaseModel):
     payment_status: Optional[PaymentStatus] = None
 
 
+class OrderUpdateIn(BaseModel):
+    """Edit data pesanan oleh admin (pelanggan, alamat, catatan, status)."""
+    customer_name: Optional[str] = Field(default=None, min_length=2, max_length=150)
+    phone: Optional[str] = Field(default=None, min_length=6, max_length=30)
+    address: Optional[str] = Field(default=None, min_length=5)
+    notes: Optional[str] = None
+    shipping_fee: Optional[float] = Field(default=None, ge=0)
+    order_status: Optional[OrderStatus] = None
+    payment_status: Optional[PaymentStatus] = None
+
+
+# ---------- Stok ----------
+StockMovementType = Literal["in", "out", "adjust"]
+
+
+class StockAdjustIn(BaseModel):
+    movement_type: StockMovementType
+    qty: int = Field(ge=0, description="in/out: jumlah; adjust: nilai stok baru")
+    note: Optional[str] = None
+
+
+class StockMovementOut(ORMModel):
+    id: str
+    product_id: str
+    product_name: str
+    movement_type: str
+    qty: int
+    stock_before: int
+    stock_after: int
+    note: Optional[str] = None
+    reference: Optional[str] = None
+    source: str
+    created_by: Optional[str] = None
+    created_at: datetime
+
+
+class StockItemOut(BaseModel):
+    id: str
+    name: str
+    slug: str
+    category_id: str
+    category_name: Optional[str] = None
+    unit: str
+    min_order: int
+    stock: int
+    price: float
+    cost_price: float
+    stock_value: float  # stok x harga beli
+    status: str  # habis | menipis | aman
+    is_active: bool
+    image_url: Optional[str] = None
+    last_movement_at: Optional[datetime] = None
+
+
+class StockSummaryOut(BaseModel):
+    total_products: int
+    total_units: int
+    total_stock_value: float
+    out_of_stock: int
+    low_stock: int
+    items: list[StockItemOut]
+
+
+class AuditLogOut(ORMModel):
+    id: str
+    actor_id: Optional[str] = None
+    actor_username: str
+    actor_role: str
+    action: str
+    entity_type: str
+    entity_id: Optional[str] = None
+    entity_label: Optional[str] = None
+    description: str
+    meta: Optional[dict[str, Any]] = None
+    created_at: datetime
+
+
+class ProductProfitOut(BaseModel):
+    product_id: Optional[str] = None
+    product_name: str
+    qty_sold: int
+    revenue: float
+    cost: float
+    profit: float
+    margin_pct: float
+
+
 class DashboardOut(BaseModel):
     total_orders: int
     orders_today: int
@@ -190,5 +282,11 @@ class DashboardOut(BaseModel):
     total_categories: int
     total_customers: int
     low_stock_products: int
+    # Keuangan (hanya pesanan lunas / COD selesai)
+    cost_paid: float = 0
+    gross_profit: float = 0
+    margin_pct: float = 0
+    stock_value: float = 0
+    profit_by_product: list[ProductProfitOut] = []
     recent_orders: list[OrderOut]
     status_breakdown: dict[str, int]

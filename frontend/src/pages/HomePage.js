@@ -53,7 +53,7 @@ export default function HomePage() {
           <div className="mx-auto grid max-w-6xl gap-8 px-4 py-10 sm:px-6 sm:py-14 lg:grid-cols-[1.2fr_1fr] lg:items-center">
             <div className="animate-fade-up">
               <span className="inline-flex items-center gap-2 rounded-full border bg-card px-3 py-1 text-xs font-medium text-muted-foreground">
-                <ShieldCheck className="h-3.5 w-3.5 text-primary" /> Supplier resmi bahan baku untuk Dapur MBG
+                <ShieldCheck className="h-3.5 w-3.5 text-primary" /> Semoyo Joyo &middot; Solusi Belanja Terpercaya
               </span>
               <h1 className="mt-4 font-display text-3xl font-semibold leading-tight tracking-tight sm:text-4xl lg:text-5xl">
                 Pasokan bahan baku segar, harga B2B transparan.
@@ -65,7 +65,7 @@ export default function HomePage() {
                 <Button size="lg" className="gap-2 active:scale-[0.98]" onClick={() => categories[0] && scrollTo(categories[0].slug)} data-testid="hero-browse-button">
                   Lihat Katalog <ArrowRight className="h-4 w-4" />
                 </Button>
-                <Button size="lg" variant="secondary" onClick={() => navigate("/pesanan")}>
+                <Button size="lg" variant="secondary" className="border border-brand-yellow/60 bg-accent text-accent-foreground hover:bg-brand-yellow/30" onClick={() => navigate("/pesanan")}>
                   Cek Riwayat Pesanan
                 </Button>
               </div>

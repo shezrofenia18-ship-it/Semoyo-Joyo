@@ -1,5 +1,6 @@
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
-import { Leaf, ShoppingCart, Search, ClipboardList, UserRound, LogOut, ShieldCheck } from "lucide-react";
+import { ShoppingCart, Search, ClipboardList, UserRound, LogOut, ShieldCheck, LayoutDashboard } from "lucide-react";
+import { Brand } from "@/components/Brand";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useCart } from "@/context/CartContext";
@@ -16,8 +17,12 @@ import { useEffect, useState } from "react";
 
 export const Navbar = () => {
   const { count, setOpen } = useCart();
-  const { user, logoutCustomer } = useAuth();
+  const { user, logoutCustomer, isAdminLoggedIn } = useAuth();
   const navigate = useNavigate();
+  // Owner yang sudah login langsung diarahkan ke dashboard, bukan halaman login admin
+  const adminTarget = isAdminLoggedIn ? "/admin/dashboard" : "/admin";
+  const adminLabel = isAdminLoggedIn ? "Dashboard Admin" : "Portal Admin";
+  const AdminIcon = isAdminLoggedIn ? LayoutDashboard : ShieldCheck;
   const location = useLocation();
   const params = new URLSearchParams(location.search);
   const [q, setQ] = useState(params.get("q") || "");
@@ -35,15 +40,7 @@ export const Navbar = () => {
   return (
     <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85">
       <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-4 sm:px-6">
-        <Link to="/" data-testid="app-brand" className="flex shrink-0 items-center gap-2">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-            <Leaf className="h-5 w-5" />
-          </span>
-          <span className="hidden flex-col leading-tight sm:flex">
-            <span className="font-display text-base font-semibold tracking-tight">Supplier MBG</span>
-            <span className="text-[11px] text-muted-foreground">Bahan Baku Dapur Bergizi</span>
-          </span>
-        </Link>
+        <Brand to="/" data-testid="app-brand" />
 
         <form onSubmit={submitSearch} className="relative mx-auto w-full max-w-md">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -83,8 +80,8 @@ export const Navbar = () => {
                 <DropdownMenuItem onClick={() => navigate("/pesanan")} data-testid="menu-orders">
                   <ClipboardList className="mr-2 h-4 w-4" /> Riwayat Pesanan
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => navigate("/admin")} data-testid="menu-admin-portal">
-                  <ShieldCheck className="mr-2 h-4 w-4" /> Portal Admin
+                <DropdownMenuItem onClick={() => navigate(adminTarget)} data-testid="menu-admin-portal">
+                  <AdminIcon className="mr-2 h-4 w-4" /> {adminLabel}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={logoutCustomer} data-testid="customer-logout">
@@ -105,16 +102,16 @@ export const Navbar = () => {
                   <UserRound className="mr-2 h-4 w-4" /> Masuk Pelanggan
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => navigate("/admin")} data-testid="menu-admin-portal">
-                  <ShieldCheck className="mr-2 h-4 w-4" /> Portal Admin (Owner)
+                <DropdownMenuItem onClick={() => navigate(adminTarget)} data-testid="menu-admin-portal">
+                  <AdminIcon className="mr-2 h-4 w-4" /> {adminLabel} (Owner)
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           )}
 
-          <Link to="/admin" className="hidden lg:block" data-testid="nav-admin-portal-link">
-            <Button variant="outline" size="sm" className="gap-2 border-primary/40 text-primary hover:bg-accent" aria-label="Portal Admin">
-              <ShieldCheck className="h-4 w-4" /> Portal Admin
+          <Link to={adminTarget} data-testid="nav-admin-portal-link" aria-label={adminLabel}>
+            <Button variant="outline" size="sm" className="gap-2 border-primary/40 text-primary hover:bg-secondary">
+              <AdminIcon className="h-4 w-4" /> <span className="hidden md:inline">{adminLabel}</span>
             </Button>
           </Link>
 
@@ -129,7 +126,7 @@ export const Navbar = () => {
             {count > 0 && (
               <span
                 data-testid="cart-count-badge"
-                className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500 px-1.5 text-[11px] font-bold text-white"
+                className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-brand-yellow px-1.5 text-[11px] font-bold text-brand-yellow-foreground"
               >
                 {count}
               </span>

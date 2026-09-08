@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
-import { Loader2, ShieldCheck, ArrowLeft } from "lucide-react";
+import { Loader2, ArrowLeft } from "lucide-react";
+import { LOGO_FULL, BRAND_NAME } from "@/components/Brand";
 import { toast } from "sonner";
 import { api, errorMessage, ADMIN_TOKEN_KEY } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
@@ -36,11 +37,11 @@ export default function AdminLoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-background px-4 py-12">
       <div className="w-full max-w-md">
         <Button variant="ghost" className="mb-4 gap-2 px-2" onClick={() => navigate("/")}><ArrowLeft className="h-4 w-4" /> Kembali ke Toko</Button>
-        <Card>
+        <Card className="border-t-4 border-t-brand-yellow">
           <CardHeader>
-            <span className="mb-2 flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-primary-foreground"><ShieldCheck className="h-5 w-5" /></span>
-            <CardTitle className="font-display text-2xl">Masuk Admin</CardTitle>
-            <CardDescription>Panel pengelolaan produk, kategori, dan pesanan (Mini ERP).</CardDescription>
+            <img src={LOGO_FULL} alt={BRAND_NAME} className="mb-3 h-12 w-auto self-start object-contain" />
+            <CardTitle className="font-display text-2xl">Masuk Admin / Owner</CardTitle>
+            <CardDescription>Panel pengelolaan produk, stok, pesanan, dan laba/rugi (Mini ERP) {BRAND_NAME}.</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={submit} className="space-y-4">

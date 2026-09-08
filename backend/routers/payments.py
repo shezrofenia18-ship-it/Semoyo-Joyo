@@ -33,6 +33,9 @@ def _instruction_out(order: Order) -> PaymentInstructionOut:
     )
 
 
+from events import broadcaster  # noqa: E402
+
+
 def _apply_status(order: Order, new_status: str) -> bool:
     """Monotonic status update; returns True if changed."""
     if RANK.get(new_status, 0) < RANK.get(order.payment_status, 0):
@@ -44,6 +47,8 @@ def _apply_status(order: Order, new_status: str) -> bool:
         order.paid_at = datetime.now(timezone.utc)
         if order.order_status == "baru":
             order.order_status = "diproses"
+        broadcaster.publish("payment.paid", {"order_id": order.id, "order_number": order.order_number, "customer_name": order.customer_name,
+                                             "total": float(order.total), "payment_method": order.payment_method})
     return True
 
 

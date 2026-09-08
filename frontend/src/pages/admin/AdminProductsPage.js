@@ -3,6 +3,7 @@ import { Plus, Pencil, Trash2, Search, Loader2, Upload, Package } from "lucide-r
 import { toast } from "sonner";
 import { api, errorMessage } from "@/lib/api";
 import { useAdminGuard } from "@/hooks/useAdminGuard";
+import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,10 +20,11 @@ import { ProductImage } from "@/components/ProductImage";
 import { rupiah } from "@/lib/format";
 
 const UNITS = ["kg", "gram", "liter", "ml", "pack", "karton", "sak", "ikat", "butir", "papan", "pouch", "jerigen", "blok", "buah", "ekor", "lusin"];
-const EMPTY = { category_id: "", name: "", description: "", price: "", unit: "kg", min_order: 1, stock: 0, image_url: "", is_active: true };
+const EMPTY = { category_id: "", name: "", description: "", price: "", cost_price: "", unit: "kg", min_order: 1, stock: 0, image_url: "", is_active: true };
 
 export default function AdminProductsPage() {
   const guard = useAdminGuard();
+  const { isOwner } = useAuth();
   const [products, setProducts] = useState(null);
   const [categories, setCategories] = useState([]);
   const [q, setQ] = useState("");
@@ -58,7 +60,7 @@ export default function AdminProductsPage() {
     setDialog({ mode: "create" });
   };
   const openEdit = (p) => {
-    setForm({ category_id: p.category_id, name: p.name, description: p.description || "", price: p.price, unit: p.unit, min_order: p.min_order, stock: p.stock, image_url: p.image_url || "", is_active: p.is_active });
+    setForm({ category_id: p.category_id, name: p.name, description: p.description || "", price: p.price, cost_price: p.cost_price ?? "", unit: p.unit, min_order: p.min_order, stock: p.stock, image_url: p.image_url || "", is_active: p.is_active });
     setDialog({ mode: "edit", data: p });
   };
 
@@ -67,7 +69,7 @@ export default function AdminProductsPage() {
     if (!form.category_id) return toast.error("Pilih kategori");
     if (!form.name.trim()) return toast.error("Nama produk wajib diisi");
     setSaving(true);
-    const payload = { ...form, price: Number(form.price) || 0, min_order: Number(form.min_order) || 1, stock: Number(form.stock) || 0, image_url: form.image_url || null, description: form.description || null };
+    const payload = { ...form, price: Number(form.price) || 0, cost_price: Number(form.cost_price) || 0, min_order: Number(form.min_order) || 1, stock: Number(form.stock) || 0, image_url: form.image_url || null, description: form.description || null };
     try {
       if (dialog.mode === "create") {
         await api.post("/admin/products", payload);
@@ -151,7 +153,9 @@ export default function AdminProductsPage() {
                 <TableRow>
                   <TableHead>Produk</TableHead>
                   <TableHead>Kategori</TableHead>
-                  <TableHead className="text-right">Harga</TableHead>
+                  <TableHead className="text-right">Harga Jual</TableHead>
+                  {isOwner && <TableHead className="text-right">Harga Beli</TableHead>}
+                  {isOwner && <TableHead className="text-right">Laba / Unit</TableHead>}
                   <TableHead className="text-right">Min. Order</TableHead>
                   <TableHead className="text-right">Stok</TableHead>
                   <TableHead>Status</TableHead>
@@ -172,6 +176,13 @@ export default function AdminProductsPage() {
                     </TableCell>
                     <TableCell className="text-sm">{p.category_name}</TableCell>
                     <TableCell className="text-right font-medium">{rupiah(p.price)}<span className="text-xs text-muted-foreground">/{p.unit}</span></TableCell>
+                    {isOwner && <TableCell className="text-right text-muted-foreground" data-testid="admin-product-cost">{rupiah(p.cost_price)}</TableCell>}
+                    {isOwner && (
+                      <TableCell className="text-right" data-testid="admin-product-profit">
+                        <span className={p.profit_per_unit < 0 ? "font-semibold text-rose-700" : "font-semibold text-emerald-700"}>{p.profit_per_unit < 0 ? "-" : ""}{rupiah(Math.abs(p.profit_per_unit))}</span>
+                        <span className="ml-1 text-xs text-muted-foreground">({p.margin_pct}%)</span>
+                      </TableCell>
+                    )}
                     <TableCell className="text-right">{p.min_order} {p.unit}</TableCell>
                     <TableCell className="text-right">
                       <span className={p.stock <= p.min_order * 2 ? "font-semibold text-amber-700" : ""}>{p.stock}</span>
@@ -180,7 +191,7 @@ export default function AdminProductsPage() {
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
                         <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Edit" onClick={() => openEdit(p)} data-testid="admin-edit-product-button"><Pencil className="h-4 w-4" /></Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" aria-label="Hapus" onClick={() => setDeleteTarget(p)} data-testid="admin-delete-product-button"><Trash2 className="h-4 w-4" /></Button>
+                        {isOwner && <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" aria-label="Hapus" onClick={() => setDeleteTarget(p)} data-testid="admin-delete-product-button"><Trash2 className="h-4 w-4" /></Button>}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -196,7 +207,7 @@ export default function AdminProductsPage() {
         <DialogContent className="max-h-[90vh] overflow-y-auto bg-card sm:max-w-2xl" data-testid="admin-crud-dialog">
           <DialogHeader>
             <DialogTitle className="font-display">{dialog?.mode === "create" ? "Tambah Produk" : "Edit Produk"}</DialogTitle>
-            <DialogDescription>Lengkapi informasi produk. Harga dalam Rupiah per satuan.</DialogDescription>
+            <DialogDescription>Lengkapi informasi produk. Harga dalam Rupiah per satuan. Harga beli dipakai untuk menghitung laba/rugi otomatis.</DialogDescription>
           </DialogHeader>
           <form onSubmit={save} className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5 sm:col-span-2">
@@ -218,9 +229,20 @@ export default function AdminProductsPage() {
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>Harga (Rp) *</Label>
+              <Label>Harga Jual (Rp) *</Label>
               <Input type="number" min="0" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} data-testid="product-form-price" required />
             </div>
+            {isOwner && (
+            <div className="space-y-1.5">
+              <Label>Harga Beli / Modal (Rp)</Label>
+              <Input type="number" min="0" value={form.cost_price} onChange={(e) => setForm({ ...form, cost_price: e.target.value })} placeholder="0" data-testid="product-form-cost-price" />
+              <p className="text-xs text-muted-foreground">
+                {Number(form.price) > 0 ? (
+                  <>Laba/unit: <span className={Number(form.price) - Number(form.cost_price || 0) < 0 ? "font-semibold text-rose-700" : "font-semibold text-emerald-700"}>{rupiah(Number(form.price) - Number(form.cost_price || 0))}</span> ({Math.round(((Number(form.price) - Number(form.cost_price || 0)) / Number(form.price)) * 1000) / 10}%)</>
+                ) : "Isi harga jual untuk melihat estimasi laba."}
+              </p>
+            </div>
+            )}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>Min. Order</Label>
@@ -232,8 +254,9 @@ export default function AdminProductsPage() {
               </div>
             </div>
             <div className="space-y-1.5 sm:col-span-2">
-              <Label>Deskripsi</Label>
-              <Textarea rows={2} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} data-testid="product-form-description" />
+              <Label>Deskripsi Produk</Label>
+              <Textarea rows={3} placeholder="Deskripsi singkat yang dibaca pembeli di beranda: kualitas, asal, kemasan, cara simpan..." value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} data-testid="product-form-description" />
+              <p className="text-xs text-muted-foreground">Tampil di kartu produk (ringkas) dan pop-up detail produk (lengkap).</p>
             </div>
             <div className="space-y-1.5 sm:col-span-2">
               <Label>Gambar Produk</Label>

@@ -10,7 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from auth import create_token, get_current_user, normalize_phone, normalize_username
 from database import get_db
-from models import Order, OrderItem, PaymentTransaction, Product, User
+from models import Order, OrderItem, PaymentTransaction, Product, StockMovement, User
+from events import broadcaster
 from payments.midtrans import midtrans
 from schemas import CheckoutIn, CheckoutOut, CustomerLoginIn, OrderOut, TokenOut, UserOut
 
@@ -21,7 +22,7 @@ async def generate_order_number(db: AsyncSession) -> str:
     today = datetime.now(timezone.utc).strftime("%Y%m%d")
     for _ in range(10):
         suffix = "".join(random.choices(string.ascii_uppercase + string.digits, k=4))
-        num = f"MBG-{today}-{suffix}"
+        num = f"SJ-{today}-{suffix}"
         exists = (await db.execute(select(Order.id).where(Order.order_number == num))).first()
         if not exists:
             return num
@@ -73,6 +74,7 @@ async def checkout(body: CheckoutIn, db: AsyncSession = Depends(get_db)):
     prods = (await db.execute(select(Product).where(Product.id.in_(ids)))).scalars().all()
     pmap = {p.id: p for p in prods}
     order_items: list[OrderItem] = []
+    movements: list[StockMovement] = []
     subtotal = Decimal("0")
     for it in body.items:
         p = pmap.get(it.product_id)
@@ -84,8 +86,12 @@ async def checkout(body: CheckoutIn, db: AsyncSession = Depends(get_db)):
             raise HTTPException(400, f"Stok {p.name} tidak mencukupi (tersisa {p.stock} {p.unit})")
         line = Decimal(p.price) * it.qty
         subtotal += line
-        order_items.append(OrderItem(product_id=p.id, product_name=p.name, image_url=p.image_url, unit=p.unit, price=p.price, qty=it.qty, subtotal=line))
+        order_items.append(OrderItem(product_id=p.id, product_name=p.name, image_url=p.image_url, unit=p.unit, price=p.price,
+                                     cost_price=p.cost_price, qty=it.qty, subtotal=line))
+        stock_before = p.stock
         p.stock -= it.qty
+        movements.append(StockMovement(product_id=p.id, product_name=p.name, movement_type="out", qty=-it.qty, stock_before=stock_before,
+                                       stock_after=p.stock, source="order", note="Pesanan pelanggan"))
 
     user = await find_or_create_customer(db, body.full_name, phone, body.address)
     order_number = await generate_order_number(db)
@@ -100,6 +106,9 @@ async def checkout(body: CheckoutIn, db: AsyncSession = Depends(get_db)):
     )
     order.items = order_items
     db.add(order)
+    for mv in movements:
+        mv.reference = order_number
+        db.add(mv)
     await db.flush()
 
     # create payment instructions right away
@@ -121,6 +130,10 @@ async def checkout(body: CheckoutIn, db: AsyncSession = Depends(get_db)):
     await db.commit()
 
     order = (await db.execute(select(Order).where(Order.id == order.id))).scalar_one()
+    broadcaster.publish("order.new", {
+        "order_id": order.id, "order_number": order_number, "customer_name": user.full_name, "total": float(total),
+        "payment_method": body.payment_method, "payment_status": order.payment_status, "items": len(order_items),
+    })
     return CheckoutOut(
         order=OrderOut.model_validate(order),
         access_token=create_token(user),

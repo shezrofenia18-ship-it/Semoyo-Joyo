@@ -92,6 +92,17 @@ async def seed_if_empty(db: AsyncSession) -> None:
         admin.role = "admin"
         admin.password_hash = hash_password(admin_password)
 
+    # ---- owner user (akses penuh: keuangan, hapus data, audit log) ----
+    owner_username = os.environ.get("OWNER_USERNAME", "owner")
+    owner_password = os.environ.get("OWNER_PASSWORD", "owner123")
+    owner = (await db.execute(select(User).where(User.username == owner_username))).scalar_one_or_none()
+    if not owner:
+        db.add(User(full_name="Owner Semoyo Joyo", username=owner_username, role="owner", password_hash=hash_password(owner_password)))
+        logger.info("seed: owner user created (%s)", owner_username)
+    else:
+        owner.role = "owner"
+        owner.password_hash = hash_password(owner_password)
+
     count = (await db.execute(select(func.count(Category.id)))).scalar() or 0
     if count == 0:
         cat_map: dict[str, Category] = {}
@@ -103,7 +114,7 @@ async def seed_if_empty(db: AsyncSession) -> None:
         for cat_name, name, desc, price, unit, min_order, stock, photo in PRODUCTS:
             db.add(Product(
                 category_id=cat_map[cat_name].id, name=name, slug=slugify(name), description=desc,
-                price=price, unit=unit, min_order=min_order, stock=stock, image_url=U + photo + Q, is_active=True,
+                price=price, cost_price=round(price * 0.8), unit=unit, min_order=min_order, stock=stock, image_url=U + photo + Q, is_active=True,
             ))
         logger.info("seed: %d categories, %d products inserted", len(CATEGORIES), len(PRODUCTS))
     await db.commit()

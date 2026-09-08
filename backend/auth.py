@@ -89,7 +89,29 @@ async def get_optional_user(authorization: Optional[str] = Header(default=None),
         return None
 
 
+STAFF_ROLES = ("admin", "owner")
+
+
+def is_owner(user: User) -> bool:
+    return user.role == "owner"
+
+
 async def get_admin_user(user: User = Depends(get_current_user)) -> User:
-    if user.role != "admin":
+    """Staff (admin ATAU owner) boleh mengakses panel admin."""
+    if user.role not in STAFF_ROLES:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Akses khusus admin")
     return user
+
+
+async def get_owner_user(user: User = Depends(get_current_user)) -> User:
+    """Hanya Owner: hapus data, keuangan/modal, audit log."""
+    if user.role != "owner":
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Aksi ini hanya dapat dilakukan oleh Owner")
+    return user
+
+
+async def user_from_token(token: str, db: AsyncSession) -> Optional[User]:
+    """Untuk SSE (EventSource tidak bisa mengirim header Authorization)."""
+    data = decode_token(token)
+    res = await db.execute(select(User).where(User.id == data.get("sub")))
+    return res.scalar_one_or_none()

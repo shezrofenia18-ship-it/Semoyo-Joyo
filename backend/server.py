@@ -28,6 +28,18 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(level
 logger = logging.getLogger("mbg")
 
 
+async def _run_light_migrations(conn) -> None:
+    """Additive, idempotent schema changes for existing databases (create_all never alters tables)."""
+    has_cost = (await conn.execute(text(
+        "SELECT 1 FROM information_schema.columns WHERE table_name='products' AND column_name='cost_price'"
+    ))).first()
+    if not has_cost:
+        await conn.execute(text("ALTER TABLE products ADD COLUMN cost_price NUMERIC(14,2) NOT NULL DEFAULT 0"))
+        # Produk lama tanpa modal: isi default 80% harga jual (sekali saja) agar laba/rugi langsung terlihat
+        await conn.execute(text("UPDATE products SET cost_price = ROUND(price * 0.8, 0) WHERE price > 0"))
+    await conn.execute(text("ALTER TABLE order_items ADD COLUMN IF NOT EXISTS cost_price NUMERIC(14,2)"))
+
+
 async def _init_db_with_retry(attempts: int = 8) -> None:
     """Start local PG (dev), create tables, seed. Retries so a slow DB boot never kills the API."""
     import asyncio
@@ -38,6 +50,7 @@ async def _init_db_with_retry(attempts: int = 8) -> None:
             ensure_local_postgres()
             async with engine.begin() as conn:
                 await conn.run_sync(Base.metadata.create_all)
+                await _run_light_migrations(conn)
             async with AsyncSessionLocal() as session:
                 await seed_if_empty(session)
             return
@@ -56,14 +69,14 @@ async def lifespan(_: FastAPI):
     await engine.dispose()
 
 
-app = FastAPI(title="MBG Supplier B2B API", version="1.0.0", lifespan=lifespan)
+app = FastAPI(title="Semoyo Joyo B2B API", version="2.0.0", lifespan=lifespan)
 
 api_router = APIRouter(prefix="/api")
 
 
 @api_router.get("/")
 async def root():
-    return {"message": "MBG Supplier B2B API", "version": "1.0.0"}
+    return {"message": "Semoyo Joyo B2B API", "version": "2.0.0"}
 
 
 @api_router.get("/health")

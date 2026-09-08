@@ -12,11 +12,16 @@ from schemas import CategoryOut, CategoryWithProducts, HomeOut, ProductOut
 router = APIRouter(tags=["catalog"])
 
 
-def product_out(p: Product, category_name: Optional[str] = None) -> ProductOut:
+def product_out(p: Product, category_name: Optional[str] = None, include_cost: bool = False) -> ProductOut:
+    """Serialize product. Harga beli/laba hanya disertakan untuk admin (include_cost=True)."""
+    price = float(p.price)
+    cost = float(p.cost_price or 0) if include_cost else 0.0
+    profit = price - cost if include_cost else 0.0
+    margin = round((profit / price) * 100, 1) if include_cost and price > 0 else 0.0
     return ProductOut(
         id=p.id, category_id=p.category_id, category_name=category_name, name=p.name, slug=p.slug,
-        description=p.description, price=float(p.price), unit=p.unit, min_order=p.min_order,
-        stock=p.stock, image_url=p.image_url, is_active=p.is_active,
+        description=p.description, price=price, cost_price=cost, profit_per_unit=profit, margin_pct=margin,
+        unit=p.unit, min_order=p.min_order, stock=p.stock, image_url=p.image_url, is_active=p.is_active,
     )
 
 

@@ -3,6 +3,7 @@ import { Plus, Pencil, Trash2, Loader2, Tags } from "lucide-react";
 import { toast } from "sonner";
 import { api, errorMessage } from "@/lib/api";
 import { useAdminGuard } from "@/hooks/useAdminGuard";
+import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,6 +21,7 @@ const EMPTY = { name: "", description: "", image_url: "", sort_order: 0, is_acti
 
 export default function AdminCategoriesPage() {
   const guard = useAdminGuard();
+  const { isOwner } = useAuth();
   const [cats, setCats] = useState(null);
   const [dialog, setDialog] = useState(null);
   const [form, setForm] = useState(EMPTY);
@@ -120,7 +122,7 @@ export default function AdminCategoriesPage() {
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
                       <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Edit" onClick={() => openEdit(c)} data-testid="admin-edit-category-button"><Pencil className="h-4 w-4" /></Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" aria-label="Hapus" onClick={() => setDeleteTarget(c)} data-testid="admin-delete-category-button"><Trash2 className="h-4 w-4" /></Button>
+                      {isOwner && <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" aria-label="Hapus" onClick={() => setDeleteTarget(c)} data-testid="admin-delete-category-button"><Trash2 className="h-4 w-4" /></Button>}
                     </div>
                   </TableCell>
                 </TableRow>
