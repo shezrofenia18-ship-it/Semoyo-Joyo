@@ -37,7 +37,7 @@ export default function OrdersPage() {
         <EmptyState
           icon={LogIn}
           title="Masuk untuk melihat riwayat pesanan"
-          description="Gunakan Nama Lengkap dan No. Telp/WA yang sama seperti saat checkout."
+          description="Gunakan Nama / Nama usaha dan No. Telp/WA yang sama seperti saat checkout."
           actionLabel="Masuk"
           onAction={() => navigate("/masuk")}
           testId="orders-login-prompt"

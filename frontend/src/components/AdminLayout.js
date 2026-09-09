@@ -1,6 +1,8 @@
 import { useEffect } from "react";
 import { NavLink, Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { LayoutDashboard, Package, Tags, ClipboardList, LogOut, Store, Boxes, ScrollText, Bell, BellOff, ShieldCheck, UserCog, FileBarChart2 } from "lucide-react";
+import { LayoutDashboard, Package, Tags, ClipboardList, LogOut, Store, Boxes, ScrollText, Bell, BellOff, ShieldCheck, UserCog, FileBarChart2, HandCoins, ReceiptText, Settings } from "lucide-react";
+import { toast } from "sonner";
+import { ADMIN_LOGIN_PATH } from "@/hooks/useAdminGuard";
 import { useAdminEvents } from "@/hooks/useAdminEvents";
 import { BrandIcon, BRAND_NAME } from "@/components/Brand";
 import { Button } from "@/components/ui/button";
@@ -11,6 +13,8 @@ import { cn } from "@/lib/utils";
 const NAV = [
   { to: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard, testid: "admin-nav-dashboard" },
   { to: "/admin/pesanan", label: "Pesanan", icon: ClipboardList, testid: "admin-nav-orders" },
+  { to: "/admin/piutang", label: "Piutang", icon: HandCoins, testid: "admin-nav-receivables" },
+  { to: "/admin/pengeluaran", label: "Pengeluaran", icon: ReceiptText, testid: "admin-nav-expenses" },
   { to: "/admin/produk", label: "Produk", icon: Package, testid: "admin-nav-products" },
   { to: "/admin/stok", label: "Stok Barang", icon: Boxes, testid: "admin-nav-stock" },
   { to: "/admin/kategori", label: "Kategori", icon: Tags, testid: "admin-nav-categories" },
@@ -29,6 +33,7 @@ const UnreadDot = ({ to, unread }) => (to === "/admin/pesanan" && unread > 0 ? (
 const OWNER_NAV = [
   { to: "/admin/laporan", label: "Laporan", icon: FileBarChart2, testid: "admin-nav-reports", ownerOnly: true },
   { to: "/admin/audit-log", label: "Audit Log", icon: ScrollText, testid: "admin-nav-audit-log", ownerOnly: true },
+  { to: "/admin/pengaturan", label: "Pengaturan", icon: Settings, testid: "admin-nav-settings", ownerOnly: true },
 ];
 
 export const AdminLayout = () => {
@@ -47,12 +52,19 @@ export const AdminLayout = () => {
     if (location.pathname.startsWith("/admin/pesanan")) clearUnread();
   }, [location.pathname, clearUnread]);
 
-  if (!token) return <Navigate to="/admin" replace />;
+  useEffect(() => {
+    if (new URLSearchParams(location.search).get("denied") === "owner") {
+      toast.error("Halaman tersebut hanya dapat diakses oleh Owner");
+      navigate("/admin/dashboard", { replace: true });
+    }
+  }, [location.search, navigate]);
+
+  if (!token) return <Navigate to={ADMIN_LOGIN_PATH} replace />;
   const nav = isOwner ? [...NAV, ...OWNER_NAV] : NAV;
 
   const logout = () => {
     logoutAdmin();
-    navigate("/admin");
+    navigate("/");
   };
 
 

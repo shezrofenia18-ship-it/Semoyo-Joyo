@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { CheckCircle2, Copy, Loader2, RefreshCw, Truck, Landmark, QrCode, Wallet, AlertTriangle, ExternalLink, FlaskConical, ClipboardList, Receipt } from "lucide-react";
+import { CheckCircle2, Copy, Loader2, RefreshCw, Truck, Landmark, QrCode, Wallet, AlertTriangle, ExternalLink, FlaskConical, ClipboardList, Receipt, HandCoins } from "lucide-react";
 import { toast } from "sonner";
 import { api, errorMessage } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,7 @@ import { PaymentStatusBadge, OrderStatusBadge } from "@/components/StatusBadge";
 import { rupiah, formatDate, PAYMENT_METHOD_LABEL, CHANNEL_LABEL } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
-const ICONS = { cod: Truck, bank_transfer: Landmark, qris: QrCode, ewallet: Wallet };
+const ICONS = { cod: Truck, bank_transfer: Landmark, qris: QrCode, ewallet: Wallet, piutang: HandCoins };
 
 function CopyButton({ value, testId }) {
   const copy = async () => {
@@ -131,6 +131,7 @@ export default function PaymentPage() {
   const ins = payment?.instructions || {};
   const isPaid = order.payment_status === "paid";
   const isCod = order.payment_method === "cod";
+  const isPiutang = order.payment_status === "piutang" || (order.payment_method === "piutang" && !isPaid);
   const Icon = ICONS[order.payment_method] || Wallet;
   const simulation = payment?.simulation;
 
@@ -153,18 +154,20 @@ export default function PaymentPage() {
       </div>
 
       {/* Success / COD banner */}
-      {(isPaid || isCod) && (
-        <div className={cn("mt-6 flex items-start gap-3 rounded-2xl border p-5", isPaid ? "border-emerald-200 bg-emerald-50" : "border-sky-200 bg-sky-50")} data-testid="payment-success-banner">
-          <span className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-full", isPaid ? "bg-emerald-600 text-white" : "bg-sky-600 text-white")}>
-            {isPaid ? <CheckCircle2 className="h-5 w-5" /> : <Truck className="h-5 w-5" />}
+      {(isPaid || isCod || isPiutang) && (
+        <div className={cn("mt-6 flex items-start gap-3 rounded-2xl border p-5", isPaid ? "border-emerald-200 bg-emerald-50" : isPiutang ? "border-violet-200 bg-violet-50" : "border-sky-200 bg-sky-50")} data-testid="payment-success-banner">
+          <span className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white", isPaid ? "bg-emerald-600" : isPiutang ? "bg-violet-600" : "bg-sky-600")}>
+            {isPaid ? <CheckCircle2 className="h-5 w-5" /> : isPiutang ? <HandCoins className="h-5 w-5" /> : <Truck className="h-5 w-5" />}
           </span>
           <div>
-            <p className={cn("font-display text-lg font-semibold", isPaid ? "text-emerald-900" : "text-sky-900")}>
-              {isPaid ? "Pembayaran diterima, pesanan sedang diproses" : "Pesanan diterima, bayar saat barang tiba"}
+            <p className={cn("font-display text-lg font-semibold", isPaid ? "text-emerald-900" : isPiutang ? "text-violet-900" : "text-sky-900")}>
+              {isPaid ? "Pembayaran diterima, pesanan sedang diproses" : isPiutang ? "Pesanan dicatat sebagai piutang (bayar nanti)" : "Pesanan diterima, bayar saat barang tiba"}
             </p>
-            <p className={cn("mt-0.5 text-sm", isPaid ? "text-emerald-800" : "text-sky-800")}>
+            <p className={cn("mt-0.5 text-sm", isPaid ? "text-emerald-800" : isPiutang ? "text-violet-800" : "text-sky-800")}>
               {isPaid
                 ? `Lunas pada ${formatDate(order.paid_at)}. Tim kami akan menghubungi ${order.phone} untuk jadwal pengiriman.`
+                : isPiutang
+                ? `Tagihan ${rupiah(order.total)} akan ditagihkan sesuai kesepakatan. Status berubah Lunas setelah admin mengonfirmasi pembayaran Anda.`
                 : `Kurir akan menghubungi ${order.phone} sebelum pengiriman. Siapkan pembayaran ${rupiah(order.total)}.`}
             </p>
           </div>
@@ -174,7 +177,7 @@ export default function PaymentPage() {
       <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_340px]">
         {/* Instructions */}
         <div className="space-y-6">
-          {!isPaid && !isCod && (
+          {!isPaid && !isCod && !isPiutang && (
             <Card>
               <CardHeader>
                 <div className="flex items-center gap-3">
@@ -301,7 +304,7 @@ export default function PaymentPage() {
               <CardContent className="flex flex-wrap gap-2">
                 {[
                   ["bank_transfer", "bca", "BCA VA"], ["bank_transfer", "bni", "BNI VA"], ["bank_transfer", "bri", "BRI VA"], ["bank_transfer", "mandiri", "Mandiri"],
-                  ["qris", null, "QRIS"], ["ewallet", "gopay", "GoPay"], ["ewallet", "ovo", "OVO"], ["ewallet", "dana", "DANA"], ["ewallet", "shopeepay", "ShopeePay"], ["cod", null, "COD"],
+                  ["qris", null, "QRIS"], ["ewallet", "gopay", "GoPay"], ["ewallet", "ovo", "OVO"], ["ewallet", "dana", "DANA"], ["ewallet", "shopeepay", "ShopeePay"], ["cod", null, "COD"], ["piutang", null, "Bayar Nanti"],
                 ].map(([m, c, label]) => {
                   const active = order.payment_method === m && (order.payment_channel || null) === c;
                   return (

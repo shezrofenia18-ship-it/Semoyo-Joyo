@@ -9,7 +9,6 @@ import base64
 import hashlib
 import hmac
 import os
-import random
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
@@ -124,6 +123,24 @@ class MidtransService:
                     ],
                 },
                 "raw": {"mode": "manual"},
+            }
+
+        if method == "piutang":
+            return {
+                "provider": "manual",
+                "simulation": False,
+                "reference": None,
+                "payment_status": "piutang",
+                "instructions": {
+                    "type": "piutang",
+                    "title": "Bayar Nanti (Piutang / Kasbon)",
+                    "steps": [
+                        "Pesanan dicatat sebagai piutang atas nama Anda dan akan diproses oleh tim kami.",
+                        "Barang dikirim/diambil terlebih dahulu, pembayaran dilakukan belakangan sesuai kesepakatan.",
+                        "Admin akan menandai pesanan LUNAS setelah pembayaran diterima (tunai/transfer).",
+                    ],
+                },
+                "raw": {"mode": "manual", "receivable": True},
             }
 
         if not self.enabled:

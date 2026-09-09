@@ -1,12 +1,12 @@
 """Pydantic schemas (request/response) for the API."""
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-PaymentMethod = Literal["cod", "bank_transfer", "qris", "ewallet"]
+PaymentMethod = Literal["cod", "bank_transfer", "qris", "ewallet", "piutang"]
 OrderStatus = Literal["baru", "diproses", "dikirim", "selesai", "dibatalkan"]
-PaymentStatus = Literal["pending", "paid", "failed", "expired", "cod"]
+PaymentStatus = Literal["pending", "paid", "failed", "expired", "cod", "piutang"]
 
 
 class ORMModel(BaseModel):
@@ -197,6 +197,32 @@ class OrderUpdateIn(BaseModel):
     payment_status: Optional[PaymentStatus] = None
 
 
+class SettleIn(BaseModel):
+    """Pelunasan piutang / pembayaran manual oleh admin."""
+    method: Literal["cash", "transfer", "qris", "ewallet", "lainnya"] = "cash"
+    note: Optional[str] = None
+    paid_at: Optional[datetime] = None
+
+
+class ReceivableCustomerOut(BaseModel):
+    user_id: Optional[str] = None
+    customer_name: str
+    phone: str
+    orders: int
+    total: float
+    oldest_at: datetime
+
+
+class ReceivablesOut(BaseModel):
+    total: float
+    count: int
+    overdue_count: int  # > 14 hari
+    settled_total: float  # piutang yang sudah dilunasi (histori)
+    settled_count: int
+    by_customer: list[ReceivableCustomerOut]
+    orders: list[OrderOut]
+
+
 # ---------- Stok ----------
 StockMovementType = Literal["in", "out", "adjust"]
 
@@ -205,6 +231,8 @@ class StockAdjustIn(BaseModel):
     movement_type: StockMovementType
     qty: int = Field(ge=0, description="in/out: jumlah; adjust: nilai stok baru")
     note: Optional[str] = None
+    expense_amount: Optional[float] = Field(default=None, ge=0, description="Biaya angkut/ongkos saat stok masuk (dicatat sebagai pengeluaran)")
+    expense_description: Optional[str] = None
 
 
 class StockMovementOut(ORMModel):
@@ -282,11 +310,157 @@ class DashboardOut(BaseModel):
     total_categories: int
     total_customers: int
     low_stock_products: int
-    # Keuangan (hanya pesanan lunas / COD selesai)
+    # Piutang (semua staf boleh lihat - untuk penagihan)
+    receivables_total: float = 0
+    receivables_count: int = 0
+    # Keuangan (hanya pesanan lunas / COD selesai / piutang selesai) - Owner
     cost_paid: float = 0
     gross_profit: float = 0
     margin_pct: float = 0
     stock_value: float = 0
+    total_expenses: float = 0
+    expenses_month: float = 0
+    net_profit: float = 0
     profit_by_product: list[ProductProfitOut] = []
     recent_orders: list[OrderOut]
     status_breakdown: dict[str, int]
+
+
+# ---------- Pengeluaran ----------
+ExpenseCategory = Literal["angkut", "operasional", "gaji", "sewa", "listrik_air", "perlengkapan", "pembelian", "lainnya"]
+
+
+class ExpenseIn(BaseModel):
+    expense_date: date
+    category: ExpenseCategory = "operasional"
+    description: str = Field(min_length=2, max_length=255)
+    amount: float = Field(gt=0)
+    payment_method: Literal["cash", "transfer"] = "cash"
+    reference: Optional[str] = Field(default=None, max_length=160)
+    note: Optional[str] = None
+
+
+class ExpenseOut(ORMModel):
+    id: str
+    expense_date: date
+    category: str
+    description: str
+    amount: float
+    payment_method: str
+    reference: Optional[str] = None
+    note: Optional[str] = None
+    source: str
+    created_by: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class ExpenseCategoryTotal(BaseModel):
+    category: str
+    total: float
+    count: int
+
+
+class ExpenseSummaryOut(BaseModel):
+    start_date: date
+    end_date: date
+    total: float
+    count: int
+    by_category: list[ExpenseCategoryTotal]
+    items: list[ExpenseOut]
+
+
+# ---------- Pengaturan (Owner) ----------
+class StaffCredentialsIn(BaseModel):
+    """Ubah username dan/atau password akun staf. Wajib konfirmasi password owner yang sedang login."""
+    owner_password: str = Field(min_length=1)
+    username: Optional[str] = Field(default=None, min_length=3, max_length=50)
+    password: Optional[str] = Field(default=None, min_length=6, max_length=100)
+    full_name: Optional[str] = Field(default=None, min_length=2, max_length=150)
+
+
+class StaffCreateIn(BaseModel):
+    owner_password: str = Field(min_length=1)
+    username: str = Field(min_length=3, max_length=50)
+    password: str = Field(min_length=6, max_length=100)
+    full_name: str = Field(min_length=2, max_length=150)
+
+
+class StoreProfileIn(BaseModel):
+    store_name: str = Field(min_length=2, max_length=150)
+    tagline: Optional[str] = Field(default=None, max_length=200)
+    owner_name: Optional[str] = Field(default=None, max_length=150)
+    address: Optional[str] = None
+    city: Optional[str] = Field(default=None, max_length=120)
+    phone: Optional[str] = Field(default=None, max_length=30)
+    whatsapp: Optional[str] = Field(default=None, max_length=30)
+    email: Optional[str] = Field(default=None, max_length=150)
+    description: Optional[str] = None
+    operating_hours: Optional[str] = Field(default=None, max_length=150)
+    bank_name: Optional[str] = Field(default=None, max_length=60)
+    bank_account: Optional[str] = Field(default=None, max_length=60)
+    bank_holder: Optional[str] = Field(default=None, max_length=150)
+
+
+class StoreProfileOut(ORMModel):
+    store_name: str
+    tagline: Optional[str] = None
+    owner_name: Optional[str] = None
+    address: Optional[str] = None
+    city: Optional[str] = None
+    phone: Optional[str] = None
+    whatsapp: Optional[str] = None
+    email: Optional[str] = None
+    description: Optional[str] = None
+    operating_hours: Optional[str] = None
+    bank_name: Optional[str] = None
+    bank_account: Optional[str] = None
+    bank_holder: Optional[str] = None
+    updated_by: Optional[str] = None
+    updated_at: Optional[datetime] = None
+
+
+class CustomerAnalyticsOut(BaseModel):
+    id: str
+    full_name: str
+    username: str
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    created_at: datetime
+    order_count: int
+    paid_orders: int
+    total_spent: float  # dari pesanan terjual
+    total_all_orders: float  # semua pesanan tidak dibatalkan
+    receivable_total: float
+    receivable_count: int
+    first_order_at: Optional[datetime] = None
+    last_order_at: Optional[datetime] = None
+    avg_order_value: float
+    segment: str  # tetap | aktif | baru | pasif
+
+
+class CustomersAnalyticsSummary(BaseModel):
+    total_customers: int
+    regular_customers: int
+    new_this_month: int
+    with_receivables: int
+    customers: list[CustomerAnalyticsOut]
+
+
+class SyncCheck(BaseModel):
+    key: str
+    label: str
+    checked: int
+    fixed: int
+    warnings: list[str] = []
+    status: str  # ok | fixed | warning
+
+
+class SyncResultOut(BaseModel):
+    ran_at: datetime
+    duration_ms: int
+    total_checked: int
+    total_fixed: int
+    total_warnings: int
+    checks: list[SyncCheck]
+    snapshot: dict[str, Any]

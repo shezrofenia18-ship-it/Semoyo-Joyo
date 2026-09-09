@@ -1,8 +1,7 @@
 """Admin endpoints: login, dashboard, CRUD kategori/produk, orders, upload gambar."""
-import os
 import re
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
 from typing import Optional
@@ -18,11 +17,13 @@ from audit import log_action
 from auth import STAFF_ROLES, create_token, get_admin_user, get_owner_user, is_owner, user_from_token, verify_password
 from database import get_db
 from events import broadcaster, sse_format
-from models import AuditLog, Category, Order, OrderItem, Product, StockMovement, User
+from finance import COST_EXPR, RECEIVABLE_FILTER, SOLD_FILTER, receivables_totals, snapshot
+from models import AuditLog, Category, Expense, Order, OrderItem, PaymentTransaction, Product, StockMovement, User
+from routers.expenses import monthly_expense_total
 from routers.catalog import product_out
 from schemas import (
     AdminLoginIn, AuditLogOut, CategoryIn, CategoryOut, DashboardOut, OrderOut, OrderStatusUpdateIn, OrderUpdateIn, ProductIn, ProductOut,
-    ProductProfitOut, StockAdjustIn, StockItemOut, StockMovementOut, StockSummaryOut, TokenOut, UserOut,
+    ProductProfitOut, ReceivableCustomerOut, ReceivablesOut, SettleIn, StockAdjustIn, StockItemOut, StockMovementOut, StockSummaryOut, TokenOut, UserOut,
 )
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -31,8 +32,8 @@ UPLOAD_DIR = Path(__file__).resolve().parent.parent / "uploads"
 UPLOAD_DIR.mkdir(exist_ok=True)
 ALLOWED_EXT = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 
-# Pesanan yang dihitung sebagai "terjual" untuk laba/rugi: lunas (paid) ATAU COD yang sudah selesai
-PROFIT_FILTER = (Order.payment_status == "paid") | ((Order.payment_method == "cod") & (Order.order_status == "selesai"))
+# Definisi "terjual" terpusat di finance.py (SOLD_FILTER) agar Dashboard, Laporan & Sinkronisasi konsisten
+PROFIT_FILTER = SOLD_FILTER
 
 
 def stock_status(stock: int, min_order: int) -> str:
@@ -159,45 +160,42 @@ async def dashboard(admin: User = Depends(get_admin_user), db: AsyncSession = De
     recent = (await db.execute(select(Order).order_by(Order.created_at.desc()).limit(8))).scalars().all()
     breakdown_rows = (await db.execute(select(Order.order_status, func.count(Order.id)).group_by(Order.order_status))).all()
 
-    # ---- Keuangan: laba/rugi dari pesanan lunas / COD selesai ----
-    # HPP per item = cost_price snapshot saat pesanan; fallback ke harga beli produk saat ini; fallback 0
-    cost_expr = func.coalesce(OrderItem.cost_price, Product.cost_price, 0)
+    # ---- Keuangan: laba/rugi dari pesanan terjual (definisi terpusat di finance.py) ----
     profit_stmt = (
         select(
             OrderItem.product_id, func.max(OrderItem.product_name), func.sum(OrderItem.qty),
-            func.sum(OrderItem.subtotal), func.sum(cost_expr * OrderItem.qty),
+            func.sum(OrderItem.subtotal), func.sum(COST_EXPR * OrderItem.qty),
         )
         .join(Order, Order.id == OrderItem.order_id)
         .outerjoin(Product, Product.id == OrderItem.product_id)
-        .where(PROFIT_FILTER, Order.order_status != "dibatalkan")
+        .where(SOLD_FILTER)
         .group_by(OrderItem.product_id)
     )
     profit_rows = (await db.execute(profit_stmt)).all()
     profit_by_product: list[ProductProfitOut] = []
-    total_rev = 0.0
-    total_cost = 0.0
     for pid, pname, qty, rev, cost in profit_rows:
         rev_f, cost_f = float(rev or 0), float(cost or 0)
-        total_rev += rev_f
-        total_cost += cost_f
         profit_by_product.append(ProductProfitOut(
             product_id=pid, product_name=pname, qty_sold=int(qty or 0), revenue=rev_f, cost=cost_f, profit=rev_f - cost_f,
             margin_pct=round(((rev_f - cost_f) / rev_f) * 100, 1) if rev_f > 0 else 0.0,
         ))
     profit_by_product.sort(key=lambda r: r.profit, reverse=True)
-    revenue_sold = (await db.execute(select(func.coalesce(func.sum(Order.total), 0)).where(PROFIT_FILTER, Order.order_status != "dibatalkan"))).scalar() or 0
-    gross_profit = float(revenue_sold) - total_cost
-    margin = round((gross_profit / float(revenue_sold)) * 100, 1) if float(revenue_sold) > 0 else 0.0
-    stock_value = (await db.execute(select(func.coalesce(func.sum(Product.stock * Product.cost_price), 0)))).scalar() or 0
+    snap = await snapshot(db)
+    expenses_month = await monthly_expense_total(db)
 
+    total_cost, gross_profit, margin, stock_value = snap.sales_cost, snap.gross_profit, snap.margin_pct, snap.stock_value
+    total_expenses, net_profit = snap.total_expenses, snap.net_profit
     if not is_owner(admin):
         # RBAC: admin biasa tidak melihat modal/laba murni
-        total_cost, gross_profit, margin, stock_value, profit_by_product = 0.0, 0.0, 0.0, 0, []
+        total_cost, gross_profit, margin, stock_value, profit_by_product = 0.0, 0.0, 0.0, 0.0, []
+        total_expenses, net_profit, expenses_month = 0.0, 0.0, 0.0
 
     return DashboardOut(
-        total_orders=total_orders, orders_today=orders_today, pending_payments=pending_payments, revenue_paid=float(revenue_sold),
+        total_orders=total_orders, orders_today=orders_today, pending_payments=pending_payments, revenue_paid=snap.sales_revenue,
         total_products=total_products, total_categories=total_categories, total_customers=total_customers, low_stock_products=low_stock,
+        receivables_total=snap.receivables_total, receivables_count=snap.receivables_count,
         cost_paid=total_cost, gross_profit=gross_profit, margin_pct=margin, stock_value=float(stock_value), profit_by_product=profit_by_product[:10],
+        total_expenses=total_expenses, expenses_month=expenses_month, net_profit=net_profit,
         recent_orders=[OrderOut.model_validate(o) for o in recent], status_breakdown={k: v for k, v in breakdown_rows},
     )
 
@@ -459,6 +457,63 @@ async def delete_order(order_id: str, admin: User = Depends(get_owner_user), db:
     return {"ok": True, "order_number": o.order_number}
 
 
+
+# ---------- Piutang (Accounts Receivable) ----------
+@router.get("/receivables", response_model=ReceivablesOut)
+async def receivables(q: Optional[str] = Query(default=None), _: User = Depends(get_admin_user), db: AsyncSession = Depends(get_db)):
+    """Daftar piutang (pesanan belum bayar / kasbon) + rekap per pelanggan."""
+    stmt = select(Order).where(RECEIVABLE_FILTER)
+    if q:
+        like = f"%{q.strip()}%"
+        stmt = stmt.where(Order.order_number.ilike(like) | Order.customer_name.ilike(like) | Order.phone.ilike(like))
+    rows = (await db.execute(stmt.order_by(Order.created_at.asc()))).scalars().all()
+    total, count = await receivables_totals(db)
+    cutoff = datetime.now(timezone.utc) - timedelta(days=14)
+    overdue = sum(1 for o in rows if o.created_at < cutoff)
+    by: dict[str, ReceivableCustomerOut] = {}
+    for o in rows:
+        key = o.user_id or o.phone
+        c = by.get(key)
+        if not c:
+            by[key] = ReceivableCustomerOut(user_id=o.user_id, customer_name=o.customer_name, phone=o.phone, orders=0, total=0.0, oldest_at=o.created_at)
+            c = by[key]
+        c.orders += 1
+        c.total += float(o.total)
+        c.oldest_at = min(c.oldest_at, o.created_at)
+    settled_total, settled_count = (await db.execute(
+        select(func.coalesce(func.sum(Order.total), 0), func.count(Order.id)).where(Order.payment_method == "piutang", Order.payment_status == "paid")
+    )).one()
+    return ReceivablesOut(total=total, count=count, overdue_count=overdue, settled_total=float(settled_total or 0), settled_count=int(settled_count or 0),
+                          by_customer=sorted(by.values(), key=lambda c: c.total, reverse=True), orders=[OrderOut.model_validate(o) for o in rows])
+
+
+@router.post("/orders/{order_id}/settle", response_model=OrderOut)
+async def settle_order(order_id: str, body: SettleIn, admin: User = Depends(get_admin_user), db: AsyncSession = Depends(get_db)):
+    """Tandai pesanan LUNAS (pelunasan piutang / COD / pembayaran manual) + catat transaksi manual."""
+    o = (await db.execute(select(Order).where((Order.id == order_id) | (Order.order_number == order_id)))).scalar_one_or_none()
+    if not o:
+        raise HTTPException(404, "Pesanan tidak ditemukan")
+    if o.order_status == "dibatalkan":
+        raise HTTPException(400, "Pesanan sudah dibatalkan")
+    if o.payment_status == "paid":
+        raise HTTPException(400, "Pesanan sudah lunas")
+    was = o.payment_status
+    o.payment_status = "paid"
+    o.paid_at = body.paid_at or datetime.now(timezone.utc)
+    if o.order_status == "baru":
+        o.order_status = "diproses"
+    o.payment_payload = {**(o.payment_payload or {}), "settled": {"method": body.method, "note": body.note, "by": admin.username, "at": o.paid_at.isoformat()}}
+    db.add(PaymentTransaction(order_id=o.id, provider="manual", method=body.method, channel=None, status="paid", amount=o.total,
+                              reference=f"SETTLE-{o.order_number}", raw={"from_status": was, "note": body.note, "by": admin.username}))
+    log_action(db, admin, "settle", "order", f"Pelunasan {'piutang ' if was == 'piutang' else ''}pesanan {o.order_number} ({o.customer_name}) Rp {float(o.total):,.0f} via {body.method}"
+               + (f" - {body.note.strip()}" if body.note and body.note.strip() else ""), entity_id=o.id, entity_label=o.order_number,
+               meta={"from": was, "method": body.method, "amount": float(o.total)})
+    await db.commit()
+    await db.refresh(o)
+    broadcaster.publish("payment.paid", {"order_id": o.id, "order_number": o.order_number, "customer_name": o.customer_name, "total": float(o.total), "payment_method": o.payment_method})
+    return OrderOut.model_validate(o)
+
+
 # ---------- Stok Barang ----------
 @router.get("/stock", response_model=StockSummaryOut)
 async def stock_summary(q: Optional[str] = None, status: Optional[str] = Query(default=None, description="habis|menipis|aman"),
@@ -515,6 +570,10 @@ async def adjust_stock(product_id: str, body: StockAdjustIn, admin: User = Depen
         db.add(StockMovement(product_id=p.id, product_name=p.name, movement_type=body.movement_type, qty=after - before, stock_before=before,
                              stock_after=after, source="manual", note=(body.note or "").strip() or None, created_by=admin.username))
         p.stock = after
+    if body.movement_type == "in" and body.expense_amount and body.expense_amount > 0:
+        desc = (body.expense_description or "").strip() or f"Ongkos angkut stok masuk {p.name} ({body.qty} {p.unit})"
+        db.add(Expense(expense_date=datetime.now(timezone(timedelta(hours=7))).date(), category="angkut", description=desc, amount=body.expense_amount,
+                       payment_method="cash", reference=p.name, note=(body.note or "").strip() or None, source="stock_in", created_by=admin.username))
     label = {"in": "menambah", "out": "mengurangi", "adjust": "menyetel"}[body.movement_type]
     log_action(db, admin, "stock_adjust", "stock", f"{label.capitalize()} stok '{p.name}': {before} -> {after} {p.unit}" + (f" ({body.note.strip()})" if body.note and body.note.strip() else ""),
                entity_id=p.id, entity_label=p.name, meta={"type": body.movement_type, "before": before, "after": after})

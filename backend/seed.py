@@ -80,28 +80,28 @@ PRODUCTS = [
 
 
 async def seed_if_empty(db: AsyncSession) -> None:
-    # ---- admin user ----
+    # ---- akun staf: HANYA dibuat bila belum ada akun dengan role tsb (kredensial yang diubah Owner tidak di-reset saat restart) ----
     admin_username = os.environ.get("ADMIN_USERNAME", "admin")
     admin_password = os.environ.get("ADMIN_PASSWORD", "admin123")
-    res = await db.execute(select(User).where(User.username == admin_username))
-    admin = res.scalar_one_or_none()
-    if not admin:
-        db.add(User(full_name="Administrator", username=admin_username, role="admin", password_hash=hash_password(admin_password)))
+    has_admin = (await db.execute(select(User.id).where(User.role == "admin").limit(1))).first()
+    if not has_admin:
+        existing = (await db.execute(select(User).where(User.username == admin_username))).scalar_one_or_none()
+        if existing:
+            existing.role, existing.password_hash = "admin", hash_password(admin_password)
+        else:
+            db.add(User(full_name="Administrator", username=admin_username, role="admin", password_hash=hash_password(admin_password)))
         logger.info("seed: admin user created (%s)", admin_username)
-    else:
-        admin.role = "admin"
-        admin.password_hash = hash_password(admin_password)
 
-    # ---- owner user (akses penuh: keuangan, hapus data, audit log) ----
     owner_username = os.environ.get("OWNER_USERNAME", "owner")
     owner_password = os.environ.get("OWNER_PASSWORD", "owner123")
-    owner = (await db.execute(select(User).where(User.username == owner_username))).scalar_one_or_none()
-    if not owner:
-        db.add(User(full_name="Owner Semoyo Joyo", username=owner_username, role="owner", password_hash=hash_password(owner_password)))
+    has_owner = (await db.execute(select(User.id).where(User.role == "owner").limit(1))).first()
+    if not has_owner:
+        existing = (await db.execute(select(User).where(User.username == owner_username))).scalar_one_or_none()
+        if existing:
+            existing.role, existing.password_hash = "owner", hash_password(owner_password)
+        else:
+            db.add(User(full_name="Owner Semoyo Joyo", username=owner_username, role="owner", password_hash=hash_password(owner_password)))
         logger.info("seed: owner user created (%s)", owner_username)
-    else:
-        owner.role = "owner"
-        owner.password_hash = hash_password(owner_password)
 
     count = (await db.execute(select(func.count(Category.id)))).scalar() or 0
     if count == 0:

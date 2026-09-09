@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Search, ClipboardList, Loader2, Eye, Pencil, Trash2, Save } from "lucide-react";
+import { Search, ClipboardList, Loader2, Eye, Pencil, Trash2, Save, CheckCircle2, HandCoins } from "lucide-react";
 import { toast } from "sonner";
 import { api, errorMessage } from "@/lib/api";
 import { useAdminGuard } from "@/hooks/useAdminGuard";
@@ -17,7 +17,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { PaymentStatusBadge, OrderStatusBadge } from "@/components/StatusBadge";
-import { rupiah, formatDate, ORDER_STATUS_LABEL, PAYMENT_STATUS_LABEL, PAYMENT_METHOD_LABEL, CHANNEL_LABEL } from "@/lib/format";
+import { rupiah, formatDate, ORDER_STATUS_LABEL, PAYMENT_STATUS_LABEL, PAYMENT_METHOD_LABEL, CHANNEL_LABEL, SETTLE_METHOD_LABEL } from "@/lib/format";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 export default function AdminOrdersPage() {
   const guard = useAdminGuard();
@@ -32,6 +33,25 @@ export default function AdminOrdersPage() {
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [settleTarget, setSettleTarget] = useState(null);
+  const [settleForm, setSettleForm] = useState({ method: "cash", note: "" });
+
+  const submitSettle = async (e) => {
+    e.preventDefault();
+    if (!settleTarget) return;
+    setUpdating(true);
+    try {
+      const { data } = await api.post(`/admin/orders/${settleTarget.id}/settle`, { method: settleForm.method, note: settleForm.note || null });
+      setOrders((prev) => prev.map((o) => (o.id === data.id ? data : o)));
+      if (selected?.id === data.id) setSelected(data);
+      toast.success(`Pesanan ${data.order_number} ditandai LUNAS`);
+      setSettleTarget(null);
+    } catch (err) {
+      if (!guard(err)) toast.error(errorMessage(err));
+    } finally {
+      setUpdating(false);
+    }
+  };
 
   const openDetail = (o, edit = false) => {
     setSelected(o);
@@ -267,6 +287,14 @@ export default function AdminOrdersPage() {
                   <p>{PAYMENT_METHOD_LABEL[selected.payment_method]}{selected.payment_channel ? ` - ${CHANNEL_LABEL[selected.payment_channel] || selected.payment_channel}` : ""}</p>
                   {selected.payment_ref && <p className="break-all text-xs text-muted-foreground">Ref: {selected.payment_ref}</p>}
                   {selected.paid_at && <p className="text-xs text-emerald-700">Lunas {formatDate(selected.paid_at)}</p>}
+                  {selected.payment_status === "piutang" && (
+                    <p className="mt-1 flex items-center gap-1 text-xs text-violet-800"><HandCoins className="h-3.5 w-3.5" /> Piutang / kasbon - belum dibayar</p>
+                  )}
+                  {selected.payment_status !== "paid" && selected.order_status !== "dibatalkan" && (
+                    <Button size="sm" className="mt-3 w-full gap-2 bg-emerald-600 text-white hover:bg-emerald-700" onClick={() => { setSettleForm({ method: "cash", note: "" }); setSettleTarget(selected); }} data-testid="order-sheet-settle-button">
+                      <CheckCircle2 className="h-4 w-4" /> Tandai Lunas (pembayaran diterima)
+                    </Button>
+                  )}
                 </div>
 
                 <div className="rounded-xl border bg-card p-4 text-sm">
@@ -294,6 +322,36 @@ export default function AdminOrdersPage() {
           )}
         </SheetContent>
       </Sheet>
+
+      <Dialog open={!!settleTarget} onOpenChange={(o) => !o && setSettleTarget(null)}>
+        <DialogContent className="bg-card sm:max-w-md" data-testid="order-settle-dialog">
+          {settleTarget && (
+            <form onSubmit={submitSettle} className="space-y-4">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 font-display"><CheckCircle2 className="h-5 w-5 text-emerald-600" /> Konfirmasi Pelunasan</DialogTitle>
+                <DialogDescription>{settleTarget.order_number} &middot; {settleTarget.customer_name} &middot; <b className="text-foreground">{rupiah(settleTarget.total)}</b></DialogDescription>
+              </DialogHeader>
+              <div className="space-y-1.5">
+                <Label>Diterima melalui *</Label>
+                <Select value={settleForm.method} onValueChange={(v) => setSettleForm({ ...settleForm, method: v })}>
+                  <SelectTrigger data-testid="order-settle-method"><SelectValue /></SelectTrigger>
+                  <SelectContent>{Object.entries(SETTLE_METHOD_LABEL).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Catatan</Label>
+                <Textarea rows={2} placeholder="mis. Tunai diterima di gudang" value={settleForm.note} onChange={(e) => setSettleForm({ ...settleForm, note: e.target.value })} data-testid="order-settle-note" />
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="ghost" onClick={() => setSettleTarget(null)}>Batal</Button>
+                <Button type="submit" disabled={updating} className="gap-2 bg-emerald-600 text-white hover:bg-emerald-700" data-testid="order-settle-submit">
+                  {updating ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />} Tandai Lunas
+                </Button>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
         <AlertDialogContent className="bg-card">

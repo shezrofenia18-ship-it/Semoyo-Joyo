@@ -130,3 +130,7 @@
 - [ ] Phase 3 sisa: PO ke supplier, ongkir, notifikasi WA, invoice PDF per pesanan, aktivasi Midtrans key asli.
 
 - [x] BUGFIX DEPLOY (Sep 2026): requirements.txt dibersihkan (16 pustaka runtime, pinned, tanpa URL internal), Dockerfile backend dirapikan, .dockerignore + .env.example ditambahkan. Verified: install di venv kosong Python 3.11 sukses, backend + frontend berjalan normal di workspace.
+
+- [x] Tahap 4 (Sep 2026): checkout label "Nama / Nama usaha", akses admin stealth (/rahasia-admin + ikon gembok footer), Piutang (bayar nanti + Tandai Lunas),
+  modul Pengeluaran (+ biaya angkut saat stok masuk), RBAC owner (OwnerRoute + get_owner_user), Pengaturan owner (akun staf, profil toko,
+  database pelanggan, sinkronisasi data), finance.py sumber tunggal. Lihat memory/PRD.md.

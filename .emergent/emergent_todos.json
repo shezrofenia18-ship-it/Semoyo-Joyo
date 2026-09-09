@@ -1,26 +1,30 @@
 [
   {
-    "content": "Import repo Semoyo-Joyo ke /app (jaga frontend/.env, buat backend/.env)",
+    "content": "Backend: finance.py, models Expense + StoreProfile, schemas, piutang, expenses, settings, sync, dashboard/reports, seed fix",
     "status": "completed"
   },
   {
-    "content": "Bersihkan backend/requirements.txt (hanya dependensi nyata, pinned, tanpa URL internal)",
+    "content": "Frontend: Checkout label/placeholder, hapus banner Portal Admin, stealth /rahasia-admin, routing guard owner",
     "status": "completed"
   },
   {
-    "content": "Periksa & perbaiki backend/Dockerfile + tambah .dockerignore",
+    "content": "Frontend: metode Piutang di checkout/pembayaran, halaman Admin Piutang, settle di pesanan",
     "status": "completed"
   },
   {
-    "content": "Verifikasi pip install requirements.txt bersih di venv baru (simulasi build Docker)",
+    "content": "Frontend: halaman Pengeluaran + biaya angkut di stok masuk",
     "status": "completed"
   },
   {
-    "content": "Setup PostgreSQL 15 lokal + jalankan backend & frontend di workspace",
+    "content": "Frontend: halaman Pengaturan (Akun, Profil Toko, Database Pelanggan, Sinkronisasi Data)",
     "status": "completed"
   },
   {
-    "content": "Update PRD/plan.md + testing_agent verifikasi app berjalan normal",
+    "content": "Frontend: Dashboard & Laporan tampilkan piutang + pengeluaran; nav AdminLayout",
+    "status": "completed"
+  },
+  {
+    "content": "Testing agent end-to-end + perbaikan bug; update PRD/plan",
     "status": "completed"
   }
 ]

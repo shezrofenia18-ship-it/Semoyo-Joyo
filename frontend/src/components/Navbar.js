@@ -1,5 +1,5 @@
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
-import { ShoppingCart, Search, ClipboardList, UserRound, LogOut, ShieldCheck, LayoutDashboard } from "lucide-react";
+import { ShoppingCart, Search, ClipboardList, UserRound, LogOut, LayoutDashboard } from "lucide-react";
 import { Brand } from "@/components/Brand";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,10 +19,6 @@ export const Navbar = () => {
   const { count, setOpen } = useCart();
   const { user, logoutCustomer, isAdminLoggedIn } = useAuth();
   const navigate = useNavigate();
-  // Owner yang sudah login langsung diarahkan ke dashboard, bukan halaman login admin
-  const adminTarget = isAdminLoggedIn ? "/admin/dashboard" : "/admin";
-  const adminLabel = isAdminLoggedIn ? "Dashboard Admin" : "Portal Admin";
-  const AdminIcon = isAdminLoggedIn ? LayoutDashboard : ShieldCheck;
   const location = useLocation();
   const params = new URLSearchParams(location.search);
   const [q, setQ] = useState(params.get("q") || "");
@@ -80,9 +76,11 @@ export const Navbar = () => {
                 <DropdownMenuItem onClick={() => navigate("/pesanan")} data-testid="menu-orders">
                   <ClipboardList className="mr-2 h-4 w-4" /> Riwayat Pesanan
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => navigate(adminTarget)} data-testid="menu-admin-portal">
-                  <AdminIcon className="mr-2 h-4 w-4" /> {adminLabel}
-                </DropdownMenuItem>
+                {isAdminLoggedIn && (
+                  <DropdownMenuItem onClick={() => navigate("/admin/dashboard")} data-testid="menu-admin-dashboard">
+                    <LayoutDashboard className="mr-2 h-4 w-4" /> Dashboard Admin
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={logoutCustomer} data-testid="customer-logout">
                   <LogOut className="mr-2 h-4 w-4" /> Keluar
@@ -90,30 +88,21 @@ export const Navbar = () => {
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="gap-2" data-testid="account-menu-button">
-                  <UserRound className="h-4 w-4" />
-                  <span className="hidden sm:inline">Masuk</span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuItem onClick={() => navigate("/masuk")} data-testid="customer-login-link">
-                  <UserRound className="mr-2 h-4 w-4" /> Masuk Pelanggan
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => navigate(adminTarget)} data-testid="menu-admin-portal">
-                  <AdminIcon className="mr-2 h-4 w-4" /> {adminLabel} (Owner)
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <Link to="/masuk" data-testid="customer-login-link">
+              <Button variant="ghost" size="sm" className="gap-2" data-testid="account-menu-button">
+                <UserRound className="h-4 w-4" />
+                <span className="hidden sm:inline">Masuk</span>
+              </Button>
+            </Link>
           )}
 
-          <Link to={adminTarget} data-testid="nav-admin-portal-link" aria-label={adminLabel}>
-            <Button variant="outline" size="sm" className="gap-2 border-primary/40 text-primary hover:bg-secondary">
-              <AdminIcon className="h-4 w-4" /> <span className="hidden md:inline">{adminLabel}</span>
-            </Button>
-          </Link>
+          {isAdminLoggedIn && (
+            <Link to="/admin/dashboard" data-testid="nav-admin-dashboard-link" aria-label="Dashboard Admin">
+              <Button variant="outline" size="sm" className="gap-2 border-primary/40 text-primary hover:bg-secondary">
+                <LayoutDashboard className="h-4 w-4" /> <span className="hidden md:inline">Dashboard Admin</span>
+              </Button>
+            </Link>
+          )}
 
           <Button
             data-testid="open-cart-button"

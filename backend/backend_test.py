@@ -4,7 +4,6 @@ Tests all critical endpoints after dependency fix.
 """
 import sys
 import requests
-from datetime import datetime
 
 BASE_URL = "https://great-chaplygin-9.preview.emergentagent.com/api"
 
@@ -75,7 +74,7 @@ class TestRunner:
                                   data={"username": "admin", "password": "admin123"})
         if success:
             self.admin_token = resp.json().get('access_token')
-            print(f"   ✓ Admin token obtained")
+            print("   ✓ Admin token obtained")
         
         # 4. Admin dashboard
         if self.admin_token:
@@ -90,7 +89,7 @@ class TestRunner:
                                   data={"username": "owner", "password": "owner123"})
         if success:
             self.owner_token = resp.json().get('access_token')
-            print(f"   ✓ Owner token obtained")
+            print("   ✓ Owner token obtained")
         
         # 6. Sales report
         if self.owner_token:
@@ -100,7 +99,7 @@ class TestRunner:
                                      200, headers=headers)
             if success:
                 data = resp.json()
-                print(f"   ✓ Sales report retrieved")
+                print("   ✓ Sales report retrieved")
         
         # 7. Export XLSX (tests openpyxl dependency)
         if self.owner_token:
@@ -109,7 +108,7 @@ class TestRunner:
                                      "/admin/reports/sales/export.xlsx?start=2026-01-01&end=2026-12-31",
                                      200, headers=headers)
             if success and resp.headers.get('content-type', '').startswith('application/vnd.openxmlformats'):
-                print(f"   ✓ XLSX file generated (openpyxl working)")
+                print("   ✓ XLSX file generated (openpyxl working)")
         
         # 8. Export PDF (tests reportlab/pillow dependencies)
         if self.owner_token:
@@ -118,7 +117,7 @@ class TestRunner:
                                      "/admin/reports/sales/export.pdf?start=2026-01-01&end=2026-12-31",
                                      200, headers=headers)
             if success and resp.headers.get('content-type', '').startswith('application/pdf'):
-                print(f"   ✓ PDF file generated (reportlab/pillow working)")
+                print("   ✓ PDF file generated (reportlab/pillow working)")
         
         # 9. Get products list
         if self.admin_token:
@@ -134,7 +133,7 @@ class TestRunner:
             success, resp = self.test("Admin stock list", "GET", "/admin/stock", 200, headers=headers)
             if success:
                 stock = resp.json()
-                print(f"   ✓ Retrieved stock data")
+                print("   ✓ Retrieved stock data")
         
         # 11. Get orders list
         if self.admin_token:
@@ -142,7 +141,7 @@ class TestRunner:
             success, resp = self.test("Admin orders list", "GET", "/admin/orders", 200, headers=headers)
             if success:
                 orders = resp.json()
-                print(f"   ✓ Retrieved orders list")
+                print("   ✓ Retrieved orders list")
         
         # 12. Customer checkout flow
         # First get a product ID from home
@@ -178,13 +177,13 @@ class TestRunner:
                     success, resp = self.test("Create payment", "POST", 
                                             f"/payments/{self.order_number}/create", 200, data={})
                     if success:
-                        print(f"   ✓ Payment created")
+                        print("   ✓ Payment created")
                     
                     # 14. Simulate payment
                     success, resp = self.test("Simulate payment", "POST",
                                             f"/payments/{self.order_number}/simulate", 200)
                     if success:
-                        print(f"   ✓ Payment simulated (order should be paid)")
+                        print("   ✓ Payment simulated (order should be paid)")
                     
                     # 15. Get order details
                     success, resp = self.test("Get order details", "GET",
@@ -209,7 +208,7 @@ class TestRunner:
                 success, resp = self.test("Upload image", "POST", "/admin/upload",
                                         200, files=files, headers=headers)
                 if success:
-                    print(f"   ✓ Image upload working (python-multipart + pillow)")
+                    print("   ✓ Image upload working (python-multipart + pillow)")
             except Exception as e:
                 print(f"   ⚠ Upload test skipped: {e}")
         

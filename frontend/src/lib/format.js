@@ -12,11 +12,19 @@ export const formatDate = (iso, withTime = true) => {
   });
 };
 
+export const formatDateOnly = (iso) => {
+  if (!iso) return "-";
+  return new Date(`${String(iso).slice(0, 10)}T00:00:00`).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
+};
+
+export const daysSince = (iso) => (iso ? Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 86400000)) : 0);
+
 export const PAYMENT_METHOD_LABEL = {
   cod: "COD (Bayar di Tempat)",
   bank_transfer: "Transfer Bank",
   qris: "QRIS",
   ewallet: "E-Wallet",
+  piutang: "Bayar Nanti (Piutang)",
 };
 
 export const PAYMENT_STATUS_LABEL = {
@@ -25,6 +33,7 @@ export const PAYMENT_STATUS_LABEL = {
   failed: "Gagal",
   expired: "Kedaluwarsa",
   cod: "Bayar di Tempat",
+  piutang: "Belum Bayar / Piutang",
 };
 
 export const ORDER_STATUS_LABEL = {
@@ -45,4 +54,30 @@ export const CHANNEL_LABEL = {
   shopeepay: "ShopeePay",
   ovo: "OVO",
   dana: "DANA",
+};
+
+export const EXPENSE_CATEGORY_LABEL = {
+  angkut: "Ongkos Angkut / Kirim",
+  operasional: "Operasional",
+  gaji: "Gaji / Upah",
+  sewa: "Sewa",
+  listrik_air: "Listrik & Air",
+  perlengkapan: "Perlengkapan",
+  pembelian: "Pembelian Barang",
+  lainnya: "Lainnya",
+};
+
+export const SETTLE_METHOD_LABEL = {
+  cash: "Tunai",
+  transfer: "Transfer Bank",
+  qris: "QRIS",
+  ewallet: "E-Wallet",
+  lainnya: "Lainnya",
+};
+
+export const CUSTOMER_SEGMENT_LABEL = {
+  tetap: "Pelanggan Tetap",
+  aktif: "Aktif",
+  baru: "Baru",
+  pasif: "Pasif",
 };

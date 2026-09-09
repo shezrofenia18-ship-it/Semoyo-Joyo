@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from audit import log_action
 from auth import get_owner_user
 from database import get_db
+from finance import COST_EXPR, SOLD_FILTER, expenses_total
 from models import Order, OrderItem, Product, User
 
 router = APIRouter(prefix="/admin/reports", tags=["reports"])
@@ -30,10 +31,8 @@ BRAND_BLUE = "#0B4EA2"
 BRAND_YELLOW = "#F5C400"
 LOGO_PATH = Path(__file__).resolve().parent.parent / "assets" / "logo.png"
 
-# Pesanan yang dihitung terjual: lunas ATAU COD selesai; tidak dibatalkan
-SOLD_FILTER = ((Order.payment_status == "paid") | ((Order.payment_method == "cod") & (Order.order_status == "selesai"))) & (Order.order_status != "dibatalkan")
-
-PAYMENT_LABEL = {"cod": "COD", "bank_transfer": "Transfer Bank", "qris": "QRIS", "ewallet": "E-Wallet"}
+# Definisi "terjual" terpusat di finance.py (SOLD_FILTER): lunas ATAU COD/piutang selesai; tidak dibatalkan
+PAYMENT_LABEL = {"cod": "COD", "bank_transfer": "Transfer Bank", "qris": "QRIS", "ewallet": "E-Wallet", "piutang": "Piutang"}
 STATUS_LABEL = {"baru": "Baru", "diproses": "Diproses", "dikirim": "Dikirim", "selesai": "Selesai", "dibatalkan": "Dibatalkan"}
 MONTHS_ID = ["", "Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"]
 
@@ -62,11 +61,13 @@ class ReportRow(BaseModel):
 class ReportSummary(BaseModel):
     gross_revenue: float
     total_cost: float
-    net_profit: float
+    net_profit: float  # laba kotor (omzet - HPP)
     margin_pct: float
     paid_orders: int
     items_sold: int
     avg_order_value: float
+    total_expenses: float = 0.0  # pengeluaran operasional pada periode
+    net_profit_after_expenses: float = 0.0  # laba bersih = laba kotor - pengeluaran
 
 
 class DailyPoint(BaseModel):
@@ -134,7 +135,7 @@ def rp(n: float) -> str:
 
 async def build_report(db: AsyncSession, s: date, e: date) -> SalesReportOut:
     start_dt, end_dt = _bounds_utc(s, e)
-    cost_expr = func.coalesce(OrderItem.cost_price, Product.cost_price, 0) * OrderItem.qty
+    cost_expr = COST_EXPR * OrderItem.qty
     agg = (
         select(OrderItem.order_id, func.sum(cost_expr).label("cost"), func.sum(OrderItem.qty).label("qty"))
         .outerjoin(Product, Product.id == OrderItem.product_id)
@@ -189,9 +190,11 @@ async def build_report(db: AsyncSession, s: date, e: date) -> SalesReportOut:
 
     n = len(rows)
     net = total_rev - total_cost
+    exp_total = await expenses_total(db, start_dt, end_dt)
     summary = ReportSummary(
         gross_revenue=total_rev, total_cost=total_cost, net_profit=net, margin_pct=round(net / total_rev * 100, 1) if total_rev > 0 else 0.0,
         paid_orders=n, items_sold=items_sold, avg_order_value=round(total_rev / n, 2) if n else 0.0,
+        total_expenses=exp_total, net_profit_after_expenses=net - exp_total,
     )
     return SalesReportOut(start_date=s, end_date=e, generated_at=datetime.now(timezone.utc), summary=summary,
                           daily=sorted(daily.values(), key=lambda p: p.date), top_products=top[:15], rows=rows)
@@ -271,7 +274,7 @@ def render_xlsx(r: SalesReportOut) -> bytes:
     ws["B7"].font = Font(italic=True, color="6B7280")
     ws["B9"], ws["C9"] = "Periode", periode
     ws["B10"], ws["C10"] = "Dibuat pada", generated
-    ws["B11"], ws["C11"] = "Dasar perhitungan", "Pesanan lunas / COD selesai (tidak dibatalkan), berdasarkan tanggal pesanan"
+    ws["B11"], ws["C11"] = "Dasar perhitungan", "Pesanan lunas / COD & piutang selesai (tidak dibatalkan), berdasarkan tanggal pesanan; laba bersih = laba kotor - pengeluaran"
     for c in ("B9", "B10", "B11"):
         ws[c].font = Font(bold=True)
 
@@ -282,8 +285,10 @@ def render_xlsx(r: SalesReportOut) -> bytes:
     metrics = [
         ("Total Pendapatan Kotor", sm.gross_revenue, RP_FMT),
         ("Total Modal (HPP)", sm.total_cost, RP_FMT),
-        ("Total Laba Bersih", sm.net_profit, RP_FMT),
+        ("Total Laba Kotor", sm.net_profit, RP_FMT),
         ("Margin Laba", sm.margin_pct / 100, "0.0%"),
+        ("Total Pengeluaran Operasional", sm.total_expenses, RP_FMT),
+        ("Total Laba Bersih (setelah pengeluaran)", sm.net_profit_after_expenses, RP_FMT),
         ("Jumlah Pesanan Lunas", sm.paid_orders, "#,##0"),
         ("Total Item Terjual", sm.items_sold, "#,##0"),
         ("Rata-rata Nilai Pesanan", sm.avg_order_value, RP_FMT),
@@ -292,7 +297,7 @@ def render_xlsx(r: SalesReportOut) -> bytes:
         ws.cell(row=i, column=2, value=label).border = border
         c = ws.cell(row=i, column=3, value=val)
         c.number_format, c.border, c.alignment = fmt, border, Alignment(horizontal="right")
-        if label == "Total Laba Bersih":
+        if label.startswith("Total Laba"):
             c.font = Font(bold=True, color="047857" if val >= 0 else "B91C1C")
     ws.column_dimensions["A"].width = 3
     ws.column_dimensions["B"].width = 30
@@ -441,25 +446,28 @@ def render_pdf(r: SalesReportOut, owner_name: str) -> bytes:
     # ---- Ringkasan KPI ----
     sm = r.summary
     profit_color = green if sm.net_profit >= 0 else red
+    net_after = sm.net_profit_after_expenses
     kpis = [
         ("Total Pendapatan Kotor", rp(sm.gross_revenue), None),
         ("Total Modal (HPP)", rp(sm.total_cost), None),
-        ("Total Laba Bersih", rp(sm.net_profit), profit_color),
-        ("Margin Laba", f"{sm.margin_pct:.1f}%", None),
-        ("Jumlah Pesanan Lunas", f"{sm.paid_orders:,}".replace(",", "."), None),
+        ("Laba Kotor", rp(sm.net_profit), profit_color),
+        ("Pengeluaran", rp(sm.total_expenses), None),
+        ("Laba Bersih", rp(net_after), green if net_after >= 0 else red),
+        ("Pesanan Terjual", f"{sm.paid_orders:,}".replace(",", "."), None),
     ]
     kpi_cells = []
     for label, val, col in kpis:
         vs = ParagraphStyle("kv2", parent=kpi_val, textColor=col) if col else kpi_val
         kpi_cells.append([Paragraph(label, kpi_label), Paragraph(val, vs)])
-    kpi_tbl = Table([[Table([[cell] for cell in c], colWidths=[W / 5 - 6 * mm]) for c in kpi_cells]], colWidths=[W / 5] * 5)
+    kpi_tbl = Table([[Table([[cell] for cell in c], colWidths=[W / 6 - 6 * mm]) for c in kpi_cells]], colWidths=[W / 6] * 6)
     kpi_tbl.setStyle(TableStyle([
         ("BOX", (0, 0), (-1, -1), 0.6, line), ("INNERGRID", (0, 0), (-1, -1), 0.6, line), ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#FAFBFD")),
-        ("BACKGROUND", (2, 0), (2, 0), colors.HexColor("#ECFDF5") if sm.net_profit >= 0 else colors.HexColor("#FEF2F2")),
+        ("BACKGROUND", (4, 0), (4, 0), colors.HexColor("#ECFDF5") if net_after >= 0 else colors.HexColor("#FEF2F2")),
         ("TOPPADDING", (0, 0), (-1, -1), 6), ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
     ]))
     story += [Paragraph("Ringkasan Periode", sec), kpi_tbl, Spacer(1, 2 * mm),
-              Paragraph(f"Dasar perhitungan: pesanan <b>lunas</b> atau <b>COD selesai</b> (tidak dibatalkan) berdasarkan tanggal pesanan. "
+              Paragraph(f"Dasar perhitungan: pesanan <b>lunas</b> atau <b>COD / piutang selesai</b> (tidak dibatalkan) berdasarkan tanggal pesanan. "
+                        f"Laba bersih = laba kotor - pengeluaran operasional periode ini (margin {sm.margin_pct:.1f}%). "
                         f"Item terjual: {sm.items_sold:,} &nbsp;|&nbsp; Rata-rata nilai pesanan: {rp(sm.avg_order_value)}".replace(",", "."), note),
               Spacer(1, 5 * mm)]
 

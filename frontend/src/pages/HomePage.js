@@ -59,7 +59,7 @@ export default function HomePage() {
                 Pasokan bahan baku segar, harga B2B transparan.
               </h1>
               <p className="mt-4 max-w-xl text-base text-muted-foreground sm:text-lg">
-                Pesan beras, protein, sayur, buah, dan bumbu dalam jumlah besar. Checkout cepat tanpa registrasi, cukup nama lengkap dan nomor WA.
+                Pesan beras, protein, sayur, buah, dan bumbu dalam jumlah besar. Checkout cepat tanpa registrasi, cukup nama / nama usaha dan nomor WA.
               </p>
               <div className="mt-6 flex flex-wrap gap-3">
                 <Button size="lg" className="gap-2 active:scale-[0.98]" onClick={() => categories[0] && scrollTo(categories[0].slug)} data-testid="hero-browse-button">

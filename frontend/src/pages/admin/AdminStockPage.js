@@ -43,7 +43,7 @@ export default function AdminStockPage() {
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState("all");
   const [dialog, setDialog] = useState(null); // { type: 'in'|'out'|'adjust', item }
-  const [form, setForm] = useState({ qty: "", note: "" });
+  const [form, setForm] = useState({ qty: "", note: "", expense_amount: "", expense_description: "" });
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [history, setHistory] = useState(null); // { item, rows }
@@ -68,7 +68,7 @@ export default function AdminStockPage() {
   }, [data, q, filter]);
 
   const openDialog = (type, item) => {
-    setForm({ qty: type === "adjust" ? String(item.stock) : "", note: "" });
+    setForm({ qty: type === "adjust" ? String(item.stock) : "", note: "", expense_amount: "", expense_description: "" });
     setDialog({ type, item });
   };
 
@@ -79,7 +79,13 @@ export default function AdminStockPage() {
     if (Number.isNaN(qty) || qty < 0 || (dialog.type !== "adjust" && qty <= 0)) return toast.error("Jumlah tidak valid");
     setSaving(true);
     try {
-      const { data: updated } = await api.post(`/admin/stock/${dialog.item.id}/adjust`, { movement_type: dialog.type, qty, note: form.note || null });
+      const expense_amount = dialog.type === "in" && form.expense_amount ? Number(form.expense_amount) : null;
+      if (expense_amount !== null && (Number.isNaN(expense_amount) || expense_amount < 0)) return toast.error("Biaya angkut tidak valid");
+      const { data: updated } = await api.post(`/admin/stock/${dialog.item.id}/adjust`, {
+        movement_type: dialog.type, qty, note: form.note || null,
+        expense_amount: expense_amount || null, expense_description: form.expense_description || null,
+      });
+      if (expense_amount) toast.success(`Biaya angkut ${rupiah(expense_amount)} dicatat ke Pengeluaran`);
       setData((prev) => {
         if (!prev) return prev;
         const nextItems = prev.items.map((it) => (it.id === updated.id ? updated : it));
@@ -263,6 +269,16 @@ export default function AdminStockPage() {
                 <Label>Catatan</Label>
                 <Textarea rows={2} placeholder={dialog.type === "in" ? "mis. Pembelian dari supplier / restock" : dialog.type === "out" ? "mis. Rusak, kedaluwarsa, pemakaian internal" : "mis. Hasil stock opname"} value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} data-testid="stock-adjust-note" />
               </div>
+              {dialog.type === "in" && (
+                <div className="space-y-2 rounded-xl border border-dashed bg-muted/40 p-3" data-testid="stock-in-expense-box">
+                  <p className="text-xs font-semibold">Biaya angkut / ongkos (opsional)</p>
+                  <p className="text-[11px] text-muted-foreground">Bila ada ongkos angkut saat barang masuk, isi nominalnya. Otomatis tercatat di modul Pengeluaran (kategori Ongkos Angkut).</p>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <Input type="number" min="0" step="1" inputMode="numeric" placeholder="Nominal (Rp)" value={form.expense_amount} onChange={(e) => setForm({ ...form, expense_amount: e.target.value })} data-testid="stock-in-expense-amount" />
+                    <Input placeholder="Keterangan (opsional)" value={form.expense_description} onChange={(e) => setForm({ ...form, expense_description: e.target.value })} data-testid="stock-in-expense-description" />
+                  </div>
+                </div>
+              )}
               <DialogFooter>
                 <Button type="button" variant="ghost" onClick={() => setDialog(null)}>Batal</Button>
                 <Button type="submit" disabled={saving} className="gap-2" data-testid="stock-adjust-submit">

@@ -1,10 +1,11 @@
 """SQLAlchemy ORM models for MBG B2B E-Commerce + Mini ERP."""
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from decimal import Decimal
 
 from sqlalchemy import (
     Boolean,
+    Date,
     DateTime,
     ForeignKey,
     Integer,
@@ -113,9 +114,9 @@ class Order(Base):
     subtotal: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False, default=0)
     shipping_fee: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False, default=0)
     total: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False, default=0)
-    payment_method: Mapped[str] = mapped_column(String(30), nullable=False)  # cod | bank_transfer | qris | ewallet
+    payment_method: Mapped[str] = mapped_column(String(30), nullable=False)  # cod | bank_transfer | qris | ewallet | piutang
     payment_channel: Mapped[str | None] = mapped_column(String(40))  # bca, bni, gopay, ovo, ...
-    payment_status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")  # pending|paid|failed|expired|cod
+    payment_status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")  # pending|paid|failed|expired|cod|piutang
     order_status: Mapped[str] = mapped_column(String(20), nullable=False, default="baru")  # baru|diproses|dikirim|selesai|dibatalkan
     payment_ref: Mapped[str | None] = mapped_column(String(120))
     payment_payload: Mapped[dict | None] = mapped_column(JSONB)
@@ -154,8 +155,8 @@ class AuditLog(Base):
     actor_id: Mapped[str | None] = mapped_column(String(36), index=True)
     actor_username: Mapped[str] = mapped_column(String(150), nullable=False)
     actor_role: Mapped[str] = mapped_column(String(20), nullable=False)
-    action: Mapped[str] = mapped_column(String(40), nullable=False, index=True)  # login|create|update|delete|stock_adjust|status
-    entity_type: Mapped[str] = mapped_column(String(40), nullable=False, index=True)  # product|category|order|stock|auth
+    action: Mapped[str] = mapped_column(String(40), nullable=False, index=True)  # login|create|update|delete|stock_adjust|status|settle|sync
+    entity_type: Mapped[str] = mapped_column(String(40), nullable=False, index=True)  # product|category|order|stock|auth|expense|settings
     entity_id: Mapped[str | None] = mapped_column(String(64))
     entity_label: Mapped[str | None] = mapped_column(String(200))
     description: Mapped[str] = mapped_column(Text, nullable=False)
@@ -178,3 +179,45 @@ class PaymentTransaction(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     order: Mapped["Order"] = relationship(back_populates="transactions")
+
+
+class Expense(Base):
+    """Pengeluaran operasional (ongkos angkut, listrik, gaji, dll) - mengurangi laba bersih."""
+
+    __tablename__ = "expenses"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=gen_uuid)
+    expense_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    category: Mapped[str] = mapped_column(String(40), nullable=False, index=True)  # angkut|operasional|gaji|sewa|listrik_air|perlengkapan|lainnya
+    description: Mapped[str] = mapped_column(String(255), nullable=False)
+    amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    payment_method: Mapped[str] = mapped_column(String(20), nullable=False, default="cash")  # cash | transfer
+    reference: Mapped[str | None] = mapped_column(String(160))  # mis. nama produk / no. nota
+    note: Mapped[str | None] = mapped_column(Text)
+    source: Mapped[str] = mapped_column(String(20), nullable=False, default="manual")  # manual | stock_in
+    created_by: Mapped[str | None] = mapped_column(String(150))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class StoreProfile(Base):
+    """Identitas toko (singleton, id='default') - dikelola Owner di Pengaturan."""
+
+    __tablename__ = "store_profile"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default="default")
+    store_name: Mapped[str] = mapped_column(String(150), nullable=False, default="Semoyo Joyo")
+    tagline: Mapped[str | None] = mapped_column(String(200), default="Solusi Belanja Terpercaya")
+    owner_name: Mapped[str | None] = mapped_column(String(150))
+    address: Mapped[str | None] = mapped_column(Text)
+    city: Mapped[str | None] = mapped_column(String(120))
+    phone: Mapped[str | None] = mapped_column(String(30))
+    whatsapp: Mapped[str | None] = mapped_column(String(30))
+    email: Mapped[str | None] = mapped_column(String(150))
+    description: Mapped[str | None] = mapped_column(Text)
+    operating_hours: Mapped[str | None] = mapped_column(String(150))
+    bank_name: Mapped[str | None] = mapped_column(String(60))
+    bank_account: Mapped[str | None] = mapped_column(String(60))
+    bank_holder: Mapped[str | None] = mapped_column(String(150))
+    updated_by: Mapped[str | None] = mapped_column(String(150))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)

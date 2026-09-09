@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { ClipboardList, Clock3, Wallet, Package, Users, AlertTriangle, Tags, CalendarDays, TrendingUp, TrendingDown, Coins, Boxes, Percent, Pencil } from "lucide-react";
+import { ClipboardList, Clock3, Wallet, Package, Users, AlertTriangle, Tags, CalendarDays, TrendingUp, TrendingDown, Coins, Boxes, Percent, Pencil, HandCoins, ReceiptText, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { api, errorMessage } from "@/lib/api";
@@ -39,12 +39,14 @@ export default function AdminDashboardPage() {
     : [];
 
   const isLoss = data ? data.gross_profit < 0 : false;
+  const isNetLoss = data ? data.net_profit < 0 : false;
   const finance = data
     ? [
-        { key: "revenue", label: "Pendapatan (Omzet)", value: rupiah(data.revenue_paid), icon: Wallet, cls: "border-primary/30 bg-primary text-primary-foreground", iconCls: "text-brand-yellow", hint: "Pesanan lunas & COD selesai" },
+        { key: "revenue", label: "Pendapatan (Omzet)", value: rupiah(data.revenue_paid), icon: Wallet, cls: "border-primary/30 bg-primary text-primary-foreground", iconCls: "text-brand-yellow", hint: "Lunas, COD & piutang selesai" },
         { key: "cost", label: "Total Modal (HPP)", value: rupiah(data.cost_paid), icon: Coins, cls: "bg-card", iconCls: "text-amber-600", hint: "Harga beli x jumlah terjual" },
-        { key: "profit", label: isLoss ? "Rugi Kotor" : "Laba Kotor", value: `${isLoss ? "-" : ""}${rupiah(Math.abs(data.gross_profit))}`, icon: isLoss ? TrendingDown : TrendingUp, cls: isLoss ? "border-rose-200 bg-rose-50" : "border-emerald-200 bg-emerald-50", iconCls: isLoss ? "text-rose-700" : "text-emerald-700", valueCls: isLoss ? "text-rose-800" : "text-emerald-800", hint: "Harga jual - harga beli" },
-        { key: "margin", label: "Margin", value: `${data.margin_pct}%`, icon: Percent, cls: "border-brand-yellow/60 bg-accent", iconCls: "text-amber-700", hint: "Laba kotor / omzet" },
+        { key: "profit", label: isLoss ? "Rugi Kotor" : "Laba Kotor", value: `${isLoss ? "-" : ""}${rupiah(Math.abs(data.gross_profit))}`, icon: isLoss ? TrendingDown : TrendingUp, cls: isLoss ? "border-rose-200 bg-rose-50" : "border-emerald-200 bg-emerald-50", iconCls: isLoss ? "text-rose-700" : "text-emerald-700", valueCls: isLoss ? "text-rose-800" : "text-emerald-800", hint: `Margin ${data.margin_pct}%` },
+        { key: "expenses", label: "Pengeluaran", value: rupiah(data.total_expenses), icon: ReceiptText, cls: "bg-card", iconCls: "text-rose-600", hint: `Bulan ini ${rupiah(data.expenses_month)}`, to: "/admin/pengeluaran" },
+        { key: "net", label: isNetLoss ? "Rugi Bersih" : "Laba Bersih", value: `${isNetLoss ? "-" : ""}${rupiah(Math.abs(data.net_profit))}`, icon: isNetLoss ? TrendingDown : TrendingUp, cls: isNetLoss ? "border-rose-300 bg-rose-100" : "border-brand-yellow/60 bg-accent", iconCls: isNetLoss ? "text-rose-700" : "text-amber-700", valueCls: isNetLoss ? "text-rose-900" : "", hint: "Laba kotor - pengeluaran" },
       ]
     : [];
 
@@ -61,11 +63,11 @@ export default function AdminDashboardPage() {
       <section className="space-y-3" data-testid="finance-section">
         <div className="flex items-center gap-2">
           <h2 className="font-display text-base font-semibold">Keuangan &middot; Laba / Rugi</h2>
-          <span className="rounded-full bg-secondary px-2 py-0.5 text-[11px] font-medium text-muted-foreground">dihitung dari pesanan lunas / COD selesai</span>
+          <span className="rounded-full bg-secondary px-2 py-0.5 text-[11px] font-medium text-muted-foreground">dihitung dari pesanan lunas / COD & piutang selesai, dikurangi pengeluaran</span>
         </div>
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
           {!data
-            ? [...Array(4)].map((_, i) => <Skeleton key={i} className="h-28 rounded-xl" />)
+            ? [...Array(5)].map((_, i) => <Skeleton key={i} className="h-28 rounded-xl" />)
             : finance.map(({ key, label, value, icon: I, cls, iconCls, valueCls, hint }) => (
                 <Card key={key} className={cn("border", cls)} data-testid={`finance-kpi-${key}`}>
                   <CardContent className="p-4">
@@ -80,6 +82,21 @@ export default function AdminDashboardPage() {
               ))}
         </div>
       </section>
+      )}
+
+      {data && data.receivables_count > 0 && (
+        <Link to="/admin/piutang" className="block" data-testid="dashboard-receivables-banner">
+          <div className="flex flex-col gap-3 rounded-2xl border border-violet-200 bg-violet-50 px-5 py-4 text-violet-900 transition-colors hover:bg-violet-100 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-600 text-white"><HandCoins className="h-5 w-5" /></span>
+              <div>
+                <p className="font-display text-base font-semibold">Piutang berjalan {rupiah(data.receivables_total)}</p>
+                <p className="text-sm text-violet-800">{data.receivables_count} pesanan belum dibayar (bayar nanti / kasbon). Tandai lunas setelah pembayaran diterima.</p>
+              </div>
+            </div>
+            <span className="inline-flex items-center gap-1 text-sm font-semibold">Kelola piutang <ArrowRight className="h-4 w-4" /></span>
+          </div>
+        </Link>
       )}
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">

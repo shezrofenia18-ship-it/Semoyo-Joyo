@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
+from events import broadcaster
 from models import Order, PaymentTransaction
 from payments.midtrans import BANKS, EWALLETS, midtrans
 from schemas import PaymentCreateIn, PaymentInstructionOut
@@ -14,7 +15,7 @@ from schemas import PaymentCreateIn, PaymentInstructionOut
 router = APIRouter(prefix="/payments", tags=["payments"])
 logger = logging.getLogger("mbg.payments")
 
-RANK = {"pending": 0, "cod": 0, "expired": 1, "failed": 1, "paid": 2}
+RANK = {"pending": 0, "cod": 0, "piutang": 0, "expired": 1, "failed": 1, "paid": 2}
 
 
 async def _get_order(db: AsyncSession, order_number: str) -> Order:
@@ -31,9 +32,6 @@ def _instruction_out(order: Order) -> PaymentInstructionOut:
         payment_status=order.payment_status, amount=float(order.total), provider=payload.get("provider", "simulation"),
         simulation=bool(payload.get("simulation", True)), instructions=payload.get("instructions", {}),
     )
-
-
-from events import broadcaster  # noqa: E402
 
 
 def _apply_status(order: Order, new_status: str) -> bool:
@@ -63,6 +61,7 @@ async def payment_config():
             {"key": "bank_transfer", "name": "Transfer Bank (Virtual Account)", "channels": [{"key": k, "name": v} for k, v in BANKS.items()]},
             {"key": "qris", "name": "QRIS", "channels": []},
             {"key": "ewallet", "name": "E-Wallet", "channels": [{"key": k, "name": v} for k, v in EWALLETS.items()]},
+            {"key": "piutang", "name": "Bayar Nanti (Piutang)", "channels": []},
         ],
     }
 
@@ -107,7 +106,7 @@ async def create_payment(order_number: str, body: PaymentCreateIn, db: AsyncSess
 async def payment_status(order_number: str, db: AsyncSession = Depends(get_db)):
     """Poll status. In real mode this also queries Midtrans GET /v2/{order_id}/status."""
     order = await _get_order(db, order_number)
-    if midtrans.enabled and order.payment_status == "pending" and order.payment_method != "cod":
+    if midtrans.enabled and order.payment_status == "pending" and order.payment_method not in ("cod", "piutang"):
         try:
             remote = await midtrans.get_status(order.order_number)
             if remote and _apply_status(order, remote["status"]):
@@ -130,6 +129,8 @@ async def simulate_payment(order_number: str, db: AsyncSession = Depends(get_db)
     order = await _get_order(db, order_number)
     if order.payment_method == "cod":
         raise HTTPException(400, "Pesanan COD dibayar saat barang diterima")
+    if order.payment_method == "piutang":
+        raise HTTPException(400, "Pesanan piutang dilunasi melalui admin (Tandai Lunas)")
     if order.payment_status == "paid":
         return {"ok": True, "payment_status": "paid", "message": "Pesanan sudah dibayar"}
     _apply_status(order, "paid")

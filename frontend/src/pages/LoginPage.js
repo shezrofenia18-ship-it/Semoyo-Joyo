@@ -38,13 +38,13 @@ export default function LoginPage() {
             <UserRound className="h-5 w-5" />
           </span>
           <CardTitle className="font-display text-2xl">Masuk Pelanggan</CardTitle>
-          <CardDescription>Masukkan Nama Lengkap dan No. Telp/WA yang sama seperti saat checkout untuk melihat riwayat pesanan.</CardDescription>
+          <CardDescription>Masukkan Nama / Nama usaha dan No. Telp/WA yang sama seperti saat checkout untuk melihat riwayat pesanan.</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={submit} className="space-y-4">
             <div className="space-y-1.5">
-              <Label htmlFor="login-name">Nama Lengkap / Nama Dapur</Label>
-              <Input id="login-name" data-testid="login-full-name-input" className="h-11 bg-card" placeholder="Contoh: SPPG Dapur Melati" value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} required />
+              <Label htmlFor="login-name">Nama / Nama usaha</Label>
+              <Input id="login-name" data-testid="login-full-name-input" className="h-11 bg-card" value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} required />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="login-phone">No. Telp / WA</Label>

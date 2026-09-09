@@ -33,7 +33,7 @@ async def find_or_create_customer(db: AsyncSession, full_name: str, phone: str, 
     username = normalize_username(full_name)
     user = (await db.execute(select(User).where(User.username == username))).scalar_one_or_none()
     if user:
-        if user.role == "admin":
+        if user.role in ("admin", "owner"):
             raise HTTPException(400, "Nama ini tidak dapat digunakan, silakan gunakan nama lain")
         user.phone = phone
         user.address = address
@@ -102,7 +102,7 @@ async def checkout(body: CheckoutIn, db: AsyncSession = Depends(get_db)):
         order_number=order_number, user_id=user.id, customer_name=user.full_name, phone=phone, address=body.address,
         notes=body.notes, subtotal=subtotal, shipping_fee=shipping, total=total,
         payment_method=body.payment_method, payment_channel=body.payment_channel,
-        payment_status="cod" if body.payment_method == "cod" else "pending", order_status="baru",
+        payment_status={"cod": "cod", "piutang": "piutang"}.get(body.payment_method, "pending"), order_status="baru",
     )
     order.items = order_items
     db.add(order)

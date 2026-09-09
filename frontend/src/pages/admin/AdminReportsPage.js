@@ -128,12 +128,16 @@ export default function AdminReportsPage() {
 
   const sm = report?.summary;
   const isLoss = sm ? sm.net_profit < 0 : false;
+  const netAfter = sm ? sm.net_profit_after_expenses ?? sm.net_profit : 0;
+  const isNetLoss = netAfter < 0;
   const kpis = sm
     ? [
         { key: "revenue", label: "Total Pendapatan Kotor", value: rupiah(sm.gross_revenue), icon: Wallet, cls: "border-primary/30 bg-primary text-primary-foreground", iconCls: "text-brand-yellow", hint: `${sm.items_sold} item terjual` },
         { key: "cost", label: "Total Modal (HPP)", value: rupiah(sm.total_cost), icon: Coins, cls: "bg-card", iconCls: "text-amber-600", hint: "Harga beli x jumlah terjual" },
-        { key: "profit", label: isLoss ? "Total Rugi Bersih" : "Total Laba Bersih", value: `${isLoss ? "-" : ""}${rupiah(Math.abs(sm.net_profit))}`, icon: isLoss ? TrendingDown : TrendingUp, cls: isLoss ? "border-rose-200 bg-rose-50" : "border-emerald-200 bg-emerald-50", iconCls: isLoss ? "text-rose-700" : "text-emerald-700", valueCls: isLoss ? "text-rose-800" : "text-emerald-800", hint: `Margin ${sm.margin_pct}%` },
-        { key: "orders", label: "Jumlah Pesanan Lunas", value: sm.paid_orders, icon: ReceiptText, cls: "border-brand-yellow/60 bg-accent", iconCls: "text-amber-700", hint: sm.paid_orders ? `Rata-rata ${rupiah(sm.avg_order_value)} / pesanan` : "Belum ada pesanan lunas" },
+        { key: "profit", label: isLoss ? "Rugi Kotor" : "Laba Kotor", value: `${isLoss ? "-" : ""}${rupiah(Math.abs(sm.net_profit))}`, icon: isLoss ? TrendingDown : TrendingUp, cls: isLoss ? "border-rose-200 bg-rose-50" : "border-emerald-200 bg-emerald-50", iconCls: isLoss ? "text-rose-700" : "text-emerald-700", valueCls: isLoss ? "text-rose-800" : "text-emerald-800", hint: `Margin ${sm.margin_pct}%` },
+        { key: "expenses", label: "Pengeluaran Periode", value: rupiah(sm.total_expenses || 0), icon: ReceiptText, cls: "bg-card", iconCls: "text-rose-600", hint: "Biaya operasional tercatat" },
+        { key: "net", label: isNetLoss ? "Rugi Bersih" : "Laba Bersih", value: `${isNetLoss ? "-" : ""}${rupiah(Math.abs(netAfter))}`, icon: isNetLoss ? TrendingDown : TrendingUp, cls: isNetLoss ? "border-rose-300 bg-rose-100" : "border-brand-yellow/60 bg-accent", iconCls: isNetLoss ? "text-rose-700" : "text-amber-700", valueCls: isNetLoss ? "text-rose-900" : "", hint: "Laba kotor - pengeluaran" },
+        { key: "orders", label: "Pesanan Terjual", value: sm.paid_orders, icon: ReceiptText, cls: "bg-card", iconCls: "text-primary", hint: sm.paid_orders ? `Rata-rata ${rupiah(sm.avg_order_value)} / pesanan` : "Belum ada pesanan terjual" },
       ]
     : [];
 
@@ -148,7 +152,7 @@ export default function AdminReportsPage() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="flex items-center gap-2 font-display text-2xl font-semibold"><FileBarChart2 className="h-6 w-6 text-primary" /> Laporan Penjualan</h1>
-          <p className="text-sm text-muted-foreground">Rekap pendapatan, modal (HPP), dan laba bersih dari pesanan lunas / COD selesai. Khusus Owner.</p>
+          <p className="text-sm text-muted-foreground">Rekap pendapatan, modal (HPP), pengeluaran, dan laba bersih dari pesanan lunas / COD & piutang selesai. Khusus Owner.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" size="sm" className="gap-2" onClick={load} disabled={loading || rangeInvalid} data-testid="reports-refresh">
@@ -195,9 +199,9 @@ export default function AdminReportsPage() {
       {error && <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800" data-testid="reports-error">{error}</div>}
 
       {/* Ringkasan */}
-      <section className="grid grid-cols-2 gap-3 lg:grid-cols-4" data-testid="reports-summary">
+      <section className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6" data-testid="reports-summary">
         {!report || loading
-          ? [...Array(4)].map((_, i) => <Skeleton key={i} className="h-28 rounded-xl" />)
+          ? [...Array(6)].map((_, i) => <Skeleton key={i} className="h-28 rounded-xl" />)
           : kpis.map(({ key, label, value, icon: I, cls, iconCls, valueCls, hint }) => (
               <Card key={key} className={cn("border", cls)} data-testid={`reports-kpi-${key}`}>
                 <CardContent className="p-4">

@@ -65,3 +65,23 @@ Brand: Biru #0B4EA2 (primary), Kuning #F5C400 (aksen), Putih. Logo: frontend/pub
 - `.env.example` di root dibuat (sebelumnya tidak ada karena ter-gitignore; `.gitignore` ditambah `!.env.example`).
 - docker-compose.yml: tambah OWNER_USERNAME/OWNER_PASSWORD.
 - Workspace: repo di-import ulang, PG15 di-bundle ke /root/pg15, data /app/pgdata, 58 produk asli di-seed.
+
+## Tahap 4 (Sep 2026): UI Checkout, Akses Stealth, Piutang, Pengeluaran, RBAC + Pengaturan Owner, Sinkronisasi Data
+- Checkout: label "Nama / Nama usaha" (tanpa placeholder); halaman Masuk pelanggan ikut disesuaikan.
+- Akses staf stealth: banner "Portal Admin/Owner" & tombol navbar dihapus. Login staf hanya via URL `/rahasia-admin` atau ikon gembok
+  kecil transparan di pojok kanan bawah footer. `/admin` (bare) -> redirect ke beranda (atau dashboard bila sudah login).
+- Piutang (AR): metode bayar `piutang` ("Bayar Nanti") di checkout -> payment_status `piutang`. Admin bisa set status piutang di pesanan.
+  Halaman /admin/piutang (rekap per pelanggan, umur piutang, >14 hari, histori lunas) + "Tandai Lunas" (POST /api/admin/orders/{id}/settle,
+  method cash/transfer/qris/ewallet/lainnya + catatan -> PaymentTransaction manual + audit `settle`). Piutang diakui sebagai penjualan saat pesanan selesai.
+- Pengeluaran: tabel `expenses` (kategori angkut/operasional/gaji/sewa/listrik_air/perlengkapan/pembelian/lainnya). CRUD /api/admin/expenses
+  (hapus = owner). Halaman /admin/pengeluaran (filter periode/kategori, ringkasan per kategori). Stok masuk bisa sekaligus mencatat biaya angkut
+  (field expense_amount di POST /admin/stock/{id}/adjust, source=stock_in). Laba bersih = laba kotor - pengeluaran (Dashboard, Laporan, export xlsx/pdf).
+- finance.py = sumber tunggal SOLD_FILTER/RECEIVABLE_FILTER/COST_EXPR + snapshot() dipakai Dashboard, Laporan, Piutang, Sinkronisasi.
+- RBAC: get_owner_user untuk /api/admin/settings/*; frontend OwnerRoute (verifikasi role dari server) untuk /admin/laporan, /admin/audit-log, /admin/pengaturan.
+  403 tidak lagi men-logout admin (hanya toast). Admin tidak melihat modal/laba/pengeluaran di dashboard.
+- Pengaturan (/admin/pengaturan, owner): tab Akun Staf (ubah username/password/nama admin & owner, tambah/hapus admin; wajib konfirmasi password owner),
+  Profil Toko (store_profile singleton; GET publik /api/store/profile untuk footer; rekening internal), Database Pelanggan
+  (GET /api/admin/settings/customers: jumlah pesanan, total belanja, piutang, segmen tetap/aktif/baru/pasif), Sinkronisasi Data
+  (POST /api/admin/settings/sync: perbaiki nilai turunan deterministik - subtotal item, subtotal/total pesanan, paid_at, snapshot HPP,
+  status cod/piutang; anomali stok hanya dilaporkan; snapshot angka final; hasil disimpan di audit log action=sync, GET sync/last).
+- seed.py: akun admin/owner hanya dibuat bila belum ada akun dengan role tsb (kredensial yang diubah Owner tidak di-reset saat restart).

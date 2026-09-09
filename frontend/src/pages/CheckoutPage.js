@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Truck, Landmark, QrCode, Wallet, Loader2, ShoppingCart, Info } from "lucide-react";
+import { Truck, Landmark, QrCode, Wallet, Loader2, ShoppingCart, Info, HandCoins } from "lucide-react";
 import { toast } from "sonner";
 import { api, errorMessage } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,7 @@ const METHODS = [
   { key: "bank_transfer", title: "Transfer Bank", desc: "Virtual Account, verifikasi otomatis", icon: Landmark, testid: "payment-method-bank-transfer" },
   { key: "qris", title: "QRIS", desc: "Scan QR dari e-wallet / m-banking", icon: QrCode, testid: "payment-method-qris" },
   { key: "ewallet", title: "E-Wallet", desc: "GoPay / OVO / DANA / ShopeePay", icon: Wallet, testid: "payment-method-ewallet" },
+  { key: "piutang", title: "Bayar Nanti (Piutang)", desc: "Pelanggan tetap: ambil barang dulu, bayar belakangan", icon: HandCoins, testid: "payment-method-piutang" },
 ];
 
 export default function CheckoutPage() {
@@ -53,7 +54,7 @@ export default function CheckoutPage() {
 
   const validate = () => {
     const e = {};
-    if (form.full_name.trim().length < 2) e.full_name = "Nama lengkap wajib diisi (min. 2 karakter)";
+    if (form.full_name.trim().length < 2) e.full_name = "Nama / nama usaha wajib diisi (min. 2 karakter)";
     const digits = form.phone.replace(/\D/g, "");
     if (digits.length < 9) e.phone = "No. Telp/WA tidak valid";
     if (form.address.trim().length < 5) e.address = "Alamat wajib diisi dengan lengkap";
@@ -107,13 +108,13 @@ export default function CheckoutPage() {
               <CardTitle className="font-display text-lg">Data Pemesan & Pengiriman</CardTitle>
               <CardDescription className="flex items-start gap-2">
                 <Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                Nama Lengkap akan digunakan sebagai ID login untuk melihat riwayat pesanan Anda.
+                Nama / Nama usaha akan digunakan sebagai ID login untuk melihat riwayat pesanan Anda.
               </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
-                <Label htmlFor="full_name">Nama Lengkap / Nama Dapur *</Label>
-                <Input id="full_name" data-testid="checkout-full-name-input" placeholder="Contoh: SPPG Dapur Melati" value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} className="h-11 bg-card" />
+                <Label htmlFor="full_name">Nama / Nama usaha *</Label>
+                <Input id="full_name" data-testid="checkout-full-name-input" value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} className="h-11 bg-card" />
                 {errors.full_name && <p className="text-xs text-destructive" data-testid="error-full-name">{errors.full_name}</p>}
               </div>
               <div className="space-y-1.5">
@@ -163,6 +164,13 @@ export default function CheckoutPage() {
                   </label>
                 ))}
               </RadioGroup>
+
+              {method === "piutang" && (
+                <div className="flex items-start gap-2 rounded-xl border border-violet-200 bg-violet-50 p-4 text-sm text-violet-900" data-testid="piutang-notice">
+                  <HandCoins className="mt-0.5 h-4 w-4 shrink-0" />
+                  <p>Pesanan akan dicatat sebagai <b>piutang (kasbon)</b> atas nama Anda. Barang dikirim/diambil lebih dulu, pembayaran menyusul sesuai kesepakatan dengan admin. Status berubah <b>Lunas</b> setelah admin mengonfirmasi pembayaran.</p>
+                </div>
+              )}
 
               {channels.length > 0 && (
                 <div className="rounded-xl border bg-muted/40 p-4">
@@ -221,7 +229,7 @@ export default function CheckoutPage() {
               </div>
               <Button type="submit" disabled={submitting} className="h-11 w-full gap-2 active:scale-[0.98]" data-testid="checkout-submit-button">
                 {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                {submitting ? "Memproses..." : "Buat Pesanan & Bayar"}
+                {submitting ? "Memproses..." : method === "piutang" ? "Buat Pesanan (Bayar Nanti)" : "Buat Pesanan & Bayar"}
               </Button>
               <p className="text-center text-xs text-muted-foreground">Dengan memesan, Anda menyetujui ketentuan pembelian B2B kami.</p>
             </CardContent>
