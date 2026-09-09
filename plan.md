@@ -128,3 +128,5 @@
 - [x] WORKSPACE BARU (git clone): PG15 diinstal ulang + bundle /root/pg15, backend/.env dibuat ulang, seed otomatis 7 kategori/38 produk.
 - [x] Phase 3a SELESAI: Laporan Penjualan (Owner-only) /admin/laporan — filter periode, ringkasan (omzet/HPP/laba/pesanan lunas), tabel sortable, export Excel (.xlsx) & PDF berkop logo. routers/reports.py. Testing agent iteration_4: backend 100%, frontend lulus.
 - [ ] Phase 3 sisa: PO ke supplier, ongkir, notifikasi WA, invoice PDF per pesanan, aktivasi Midtrans key asli.
+
+- [x] BUGFIX DEPLOY (Sep 2026): requirements.txt dibersihkan (16 pustaka runtime, pinned, tanpa URL internal), Dockerfile backend dirapikan, .dockerignore + .env.example ditambahkan. Verified: install di venv kosong Python 3.11 sukses, backend + frontend berjalan normal di workspace.

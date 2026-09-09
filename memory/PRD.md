@@ -49,3 +49,19 @@ Brand: Biru #0B4EA2 (primary), Kuning #F5C400 (aksen), Putih. Logo: frontend/pub
 
 ## Backlog
 - Pembelian ke supplier (PO), laporan penjualan periode, ongkir, notifikasi WA, invoice PDF, Midtrans production
+
+## Perbaikan Build Docker Production (Sep 2026) - SELESAI
+- Penyebab: `backend/requirements.txt` adalah hasil `pip freeze` environment dev (135 paket) yang memuat
+  `litellm @ https://customer-assets.emergentagent.com/...` (URL internal, tidak bisa diakses saat build),
+  `emergentintegrations` (index privat), `s5cmd`, `librt`, `hf-xet`, `psycopg2-binary`, pandas/numpy, dll.
+  -> `pip install -r requirements.txt` exit code 1 di `python:3.11-slim`.
+- Solusi: requirements.txt ditulis ulang hanya 16 pustaka runtime nyata (fastapi, starlette, uvicorn[standard],
+  python-multipart, pydantic, python-dotenv, SQLAlchemy, asyncpg, greenlet, PyJWT, bcrypt, httpx, openpyxl,
+  reportlab, pillow) - semua wheel siap pakai, pinned, tanpa duplikat/konflik (`pip check` bersih).
+  Diverifikasi install di venv kosong Python 3.11 dengan `--no-cache-dir` -> sukses; semua modul backend ter-import.
+- `requirements-dev.txt` baru (pytest, pytest-xdist) untuk dev saja.
+- `backend/Dockerfile`: hapus build-essential/libpq-dev (tidak perlu), `pip install --upgrade pip`, 1 worker
+  (hindari race seeding), `--proxy-headers`. `backend/.dockerignore` baru (pgdata, uploads, .env, cache, tes).
+- `.env.example` di root dibuat (sebelumnya tidak ada karena ter-gitignore; `.gitignore` ditambah `!.env.example`).
+- docker-compose.yml: tambah OWNER_USERNAME/OWNER_PASSWORD.
+- Workspace: repo di-import ulang, PG15 di-bundle ke /root/pg15, data /app/pgdata, 58 produk asli di-seed.

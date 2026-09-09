@@ -1,26 +1,26 @@
 [
   {
-    "content": "Backend: routers/reports.py - GET /admin/reports/sales (owner only, date range, summary + rows)",
+    "content": "Import repo Semoyo-Joyo ke /app (jaga frontend/.env, buat backend/.env)",
     "status": "completed"
   },
   {
-    "content": "Backend: Excel export (.xlsx via openpyxl) with header, sheet names, summary",
+    "content": "Bersihkan backend/requirements.txt (hanya dependensi nyata, pinned, tanpa URL internal)",
     "status": "completed"
   },
   {
-    "content": "Backend: PDF export (reportlab) with Semoyo Joyo logo/kop, print-ready",
+    "content": "Periksa & perbaiki backend/Dockerfile + tambah .dockerignore",
     "status": "completed"
   },
   {
-    "content": "Frontend: AdminReportsPage (/admin/laporan) - filter periode, ringkasan, tabel sortable, tombol Excel/PDF; nav owner-only",
+    "content": "Verifikasi pip install requirements.txt bersih di venv baru (simulasi build Docker)",
     "status": "completed"
   },
   {
-    "content": "Seed sample paid orders for verification; update requirements.txt",
+    "content": "Setup PostgreSQL 15 lokal + jalankan backend & frontend di workspace",
     "status": "completed"
   },
   {
-    "content": "Testing agent: end-to-end test of Laporan feature (API + UI + downloads)",
+    "content": "Update PRD/plan.md + testing_agent verifikasi app berjalan normal",
     "status": "completed"
   }
 ]
