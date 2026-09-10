@@ -48,8 +48,13 @@ services:
     restart: unless-stopped
     depends_on:
       - backend
-    ports:
-      - "3000:80"
+    expose:
+      - "80"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:80/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 volumes:
   pgdata:
