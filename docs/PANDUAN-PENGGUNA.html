@@ -1,0 +1,876 @@
+<!doctype html><html lang='id'><head><meta charset='utf-8'><style>
+@page { size: A4; margin: 18mm 16mm 20mm 16mm; }
+* { box-sizing: border-box; }
+body { font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif; font-size: 10.5pt; line-height: 1.5; color: #1f2937; }
+.cover { height: 250mm; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; page-break-after: always; border-left: 8px solid #F5C400; padding-left: 28px; }
+.cover img { height: 70px; margin-bottom: 40px; }
+.cover h1 { font-size: 34pt; color: #0B4EA2; margin: 0 0 8px; line-height: 1.1; }
+.cover h2 { font-size: 16pt; color: #374151; font-weight: 500; margin: 0 0 30px; border: 0; }
+.cover .meta { color: #6b7280; font-size: 10pt; }
+h1 { font-size: 20pt; color: #0B4EA2; margin: 26px 0 10px; padding-bottom: 6px; border-bottom: 3px solid #F5C400; page-break-after: avoid; }
+h1.part { page-break-before: always; background: #0B4EA2; color: #fff; padding: 14px 16px; border-bottom: 6px solid #F5C400; font-size: 16pt; letter-spacing: .5px; }
+h2 { font-size: 15pt; color: #0B4EA2; margin: 24px 0 8px; page-break-after: avoid; page-break-before: always; }
+h2:first-of-type, h1 + h2, h1.part + h2 { page-break-before: auto; }
+h3 { font-size: 12pt; color: #111827; margin: 18px 0 6px; page-break-after: avoid; }
+p { margin: 6px 0; }
+ul, ol { margin: 6px 0 6px 0; padding-left: 22px; }
+li { margin: 3px 0; }
+code { background: #eef2ff; color: #1e3a8a; padding: 1px 5px; border-radius: 4px; font-size: 9.5pt; }
+table { border-collapse: collapse; width: 100%; margin: 10px 0 12px; font-size: 9.5pt; page-break-inside: avoid; }
+th { background: #0B4EA2; color: #fff; text-align: left; padding: 6px 8px; }
+td { border: 1px solid #d1d5db; padding: 5px 8px; vertical-align: top; }
+tr:nth-child(even) td { background: #f8fafc; }
+blockquote { margin: 10px 0; padding: 8px 14px; background: #fffbea; border-left: 4px solid #F5C400; color: #374151; }
+blockquote p { margin: 2px 0; }
+hr.sep { border: 0; border-top: 1px dashed #cbd5e1; margin: 18px 0; }
+.shot { display: flex; gap: 12px; align-items: center; border: 2px dashed #94a3b8; background: #f1f5f9; border-radius: 10px; padding: 14px 16px; margin: 12px 0; min-height: 88px; color: #475569; font-size: 9.5pt; page-break-inside: avoid; }
+.shot .cam { font-size: 22pt; }
+.shot b { color: #0B4EA2; }
+.toc-note { font-size: 9pt; color: #6b7280; }
+</style></head><body>
+<div class="cover">
+  <img src="file:///app/frontend/public/logo.png" alt="Semoyo Joyo" />
+  <h1>Panduan Pengguna Lengkap</h1>
+  <h2>Semoyo Joyo — B2B E-Commerce + Mini ERP</h2>
+  <div class="meta">Versi 1.0 · Juni 2026 · Dokumen internal untuk staf Admin &amp; Owner<br>
+  Kotak bergaris putus-putus berlogo kamera adalah placeholder tangkapan layar.</div>
+</div>
+
+<blockquote>
+<p><strong>Versi 1.0 · Juni 2026</strong> · Disusun sesuai antarmuka aplikasi yang sedang berjalan.
+Kotak bertanda 📷 adalah <strong>placeholder tangkapan layar</strong> — ganti dengan screenshot asli sebelum dibagikan.</p>
+</blockquote>
+<hr class="sep" />
+<h2>Daftar Isi</h2>
+<p><strong>Bagian A — Umum</strong>
+1. Pengenalan Aplikasi &amp; Peran Pengguna</p>
+<p><strong>Bagian B — Sisi Pelanggan (Toko Online)</strong>
+2. Beranda &amp; Katalog Produk
+3. Keranjang Belanja
+4. Checkout &amp; Memilih Metode Pembayaran
+5. Halaman Pembayaran (Transfer/VA, QRIS, E-Wallet, COD, Bayar Nanti)
+6. Riwayat Pesanan, Detail Pesanan &amp; Struk
+7. Masuk sebagai Pelanggan</p>
+<p><strong>Bagian C — Panel Admin / Owner (Mini ERP)</strong>
+8. Cara Login Staf (Admin / Owner)
+9. Mengenal Tata Letak Panel Admin
+10. Dashboard
+11. Pesanan
+12. Piutang (Bayar Nanti)
+13. Pengeluaran
+14. Produk
+15. Stok Barang
+16. Kategori
+17. Laporan Penjualan 🔒
+18. Audit Log 🔒
+19. Pengaturan 🔒 (Akun Staf, Profil Toko, Database Pelanggan, Sinkronisasi Data)</p>
+<p><strong>Bagian D — Lampiran</strong>
+20. Alur Kerja Harian yang Disarankan
+21. Istilah &amp; Status
+22. Pertanyaan Umum (FAQ)</p>
+<hr class="sep" />
+<h1 class="part">BAGIAN A — UMUM</h1>
+<h2>1. Pengenalan Aplikasi &amp; Peran Pengguna</h2>
+<p>Semoyo Joyo adalah aplikasi web untuk supplier bahan baku dapur skala B2B. Aplikasi terdiri dari dua sisi:</p>
+<table>
+<thead>
+<tr>
+<th>Sisi</th>
+<th>Alamat</th>
+<th>Pengguna</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Toko Online (Katalog)</strong></td>
+<td><code>/</code></td>
+<td>Pelanggan — memesan <strong>tanpa registrasi</strong>, cukup nama/nama usaha + nomor WA</td>
+</tr>
+<tr>
+<td><strong>Panel Admin (Mini ERP)</strong></td>
+<td><code>/admin/...</code></td>
+<td>Staf toko: <strong>Admin</strong> dan <strong>Owner</strong></td>
+</tr>
+</tbody>
+</table>
+<h3>Perbedaan Hak Akses Staf</h3>
+<table>
+<thead>
+<tr>
+<th>Fitur</th>
+<th style="text-align: center;">Admin</th>
+<th style="text-align: center;">Owner 🔒</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Dashboard, Pesanan, Piutang, Pengeluaran, Produk, Stok, Kategori</td>
+<td style="text-align: center;">✅</td>
+<td style="text-align: center;">✅</td>
+</tr>
+<tr>
+<td>Melihat Modal (HPP), Laba, Pengeluaran, Nilai Stok di Dashboard</td>
+<td style="text-align: center;">❌</td>
+<td style="text-align: center;">✅</td>
+</tr>
+<tr>
+<td>Menghapus pengeluaran / menghapus produk dari stok</td>
+<td style="text-align: center;">❌</td>
+<td style="text-align: center;">✅</td>
+</tr>
+<tr>
+<td>Laporan Penjualan, Audit Log, Pengaturan</td>
+<td style="text-align: center;">❌</td>
+<td style="text-align: center;">✅</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>Simbol 🔒 pada dokumen ini berarti <strong>hanya Owner</strong> yang dapat mengakses.</p>
+</blockquote>
+<div class="shot"><span class="cam">📷</span><div><b>Placeholder tangkapan layar</b><br>Beranda toko &amp; Dashboard admin berdampingan</div></div>
+<hr class="sep" />
+<h1 class="part">BAGIAN B — SISI PELANGGAN (TOKO ONLINE)</h1>
+<h2>2. Beranda &amp; Katalog Produk</h2>
+<p>Alamat: <code>https://&lt;domain-toko&gt;/</code></p>
+<h3>Bagian-bagian halaman</h3>
+<ol>
+<li><strong>Bilah atas (Navbar)</strong>: logo Semoyo Joyo, kotak <strong>"Cari bahan baku... (beras, ayam, sayur)"</strong>, tombol <strong>Pesanan</strong>, <strong>Masuk</strong>, dan <strong>Keranjang</strong> (biru).</li>
+<li><strong>Hero</strong>: judul "Pasokan bahan baku segar, harga B2B transparan", tombol <strong>Lihat Katalog →</strong> dan <strong>Cek Riwayat Pesanan</strong>, serta 3 keunggulan (Kirim Terjadwal, Auto-verifikasi, Min. Order Jelas).</li>
+<li><strong>Chip kategori</strong> (baris bisa digeser): <em>Beras &amp; Karbohidrat, Protein Hewani, Protein Nabati, Sayuran Segar, Buah-buahan, Minyak Bumbu &amp; Rempah, Susu &amp; Olahan</em> — angka di chip = jumlah produk.</li>
+<li><strong>Bagian per kategori</strong>: judul kategori, deskripsi, dan grid kartu produk.</li>
+</ol>
+<div class="shot"><span class="cam">📷</span><div><b>Placeholder tangkapan layar</b><br>Beranda — navbar, hero, chip kategori</div></div>
+<h3>Langkah: Menelusuri katalog</h3>
+<ol>
+<li>Klik <strong>Lihat Katalog →</strong> atau gulir ke bawah.</li>
+<li>Klik <strong>chip kategori</strong> untuk melompat ke bagian kategori tersebut.</li>
+<li>Setiap <strong>kartu produk</strong> menampilkan: foto, nama, harga per satuan (mis. <em>Rp 12.500 / kg</em>), min. order, dan tombol tambah ke keranjang.</li>
+</ol>
+<div class="shot"><span class="cam">📷</span><div><b>Placeholder tangkapan layar</b><br>Grid kartu produk dalam satu kategori</div></div>
+<h3>Langkah: Mencari produk</h3>
+<ol>
+<li>Ketik kata kunci di kotak pencarian navbar, mis. <code>ayam</code>.</li>
+<li>Hasil tampil sebagai daftar produk yang cocok.</li>
+<li>Klik <strong>Hapus pencarian</strong> untuk kembali ke katalog penuh.</li>
+</ol>
+<div class="shot"><span class="cam">📷</span><div><b>Placeholder tangkapan layar</b><br>Hasil pencarian "ayam"</div></div>
+<h3>Langkah: Menambahkan ke keranjang</h3>
+<ol>
+<li>Pada kartu produk, klik tombol tambah (ikon keranjang / <strong>+</strong>).</li>
+<li>Jumlah otomatis mengikuti <strong>min. order</strong> produk (mis. 10 kg). Gunakan <strong>+ / −</strong> untuk mengubah jumlah.</li>
+<li>Ikon keranjang di navbar dan tombol keranjang melayang di kanan bawah menampilkan jumlah item.</li>
+</ol>
+<div class="shot"><span class="cam">📷</span><div><b>Placeholder tangkapan layar</b><br>Kartu produk setelah ditambahkan, dengan pengatur jumlah</div></div>
+<hr class="sep" />
+<h2>3. Keranjang Belanja</h2>
+<p>Alamat: <code>/keranjang</code> — dibuka dari tombol <strong>Keranjang</strong> di navbar atau tombol melayang kanan bawah.</p>
+<h3>Isi halaman</h3>
+<ul>
+<li>Daftar item: foto, nama, harga satuan, pengatur <strong>jumlah (+/−)</strong>, subtotal per item, ikon <strong>hapus (🗑)</strong>.</li>
+<li>Ringkasan: <strong>Subtotal</strong>, catatan ongkir (ditentukan admin), dan tombol biru <strong>Lanjut ke Checkout</strong>.</li>
+<li>Tombol kembali <strong>Belanja Lagi / ke Beranda</strong>.</li>
+</ul>
+<h3>Langkah</h3>
+<ol>
+<li>Periksa jumlah tiap item; pastikan tidak di bawah min. order (sistem akan menolak jika kurang).</li>
+<li>Hapus item yang tidak diperlukan dengan ikon 🗑.</li>
+<li>Klik <strong>Lanjut ke Checkout</strong>.</li>
+</ol>
+<div class="shot"><span class="cam">📷</span><div><b>Placeholder tangkapan layar</b><br>Halaman Keranjang dengan 2–3 item</div></div>
+<hr class="sep" />
+<h2>4. Checkout &amp; Memilih Metode Pembayaran</h2>
+<p>Alamat: <code>/checkout</code></p>
+<h3>Formulir data pemesan</h3>
+<table>
+<thead>
+<tr>
+<th>Kolom</th>
+<th style="text-align: center;">Wajib</th>
+<th>Keterangan</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Nama / Nama usaha</strong></td>
+<td style="text-align: center;">✔</td>
+<td>Nama pribadi atau nama dapur/usaha</td>
+</tr>
+<tr>
+<td><strong>No. Telp / WA</strong></td>
+<td style="text-align: center;">✔</td>
+<td>Format <code>08xxxxxxxxxx</code>; dipakai untuk melihat riwayat pesanan</td>
+</tr>
+<tr>
+<td><strong>Alamat Pengiriman</strong></td>
+<td style="text-align: center;">✔</td>
+<td>Nama jalan, kecamatan, kota/kabupaten, patokan</td>
+</tr>
+<tr>
+<td><strong>Catatan</strong></td>
+<td style="text-align: center;">–</td>
+<td>Contoh: <em>"Kirim pagi sebelum jam 09.00"</em></td>
+</tr>
+</tbody>
+</table>
+<div class="shot"><span class="cam">📷</span><div><b>Placeholder tangkapan layar</b><br>Formulir checkout terisi</div></div>
+<h3>Metode pembayaran yang tersedia</h3>
+<table>
+<thead>
+<tr>
+<th>Metode</th>
+<th>Keterangan di layar</th>
+<th>Kapan dipakai</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>COD</strong></td>
+<td>Bayar saat barang diterima</td>
+<td>Pembayaran tunai ke kurir</td>
+</tr>
+<tr>
+<td><strong>Transfer Bank</strong></td>
+<td>Virtual Account, verifikasi otomatis</td>
+<td>Transfer ke nomor VA (BCA/BNI/BRI/Mandiri/Permata)</td>
+</tr>
+<tr>
+<td><strong>QRIS</strong></td>
+<td>Scan QR dari e-wallet / m-banking</td>
+<td>Bayar scan QR</td>
+</tr>
+<tr>
+<td><strong>E-Wallet</strong></td>
+<td>GoPay / OVO / DANA / ShopeePay</td>
+<td>Bayar via aplikasi e-wallet</td>
+</tr>
+<tr>
+<td><strong>Bayar Nanti (Piutang)</strong></td>
+<td>Pelanggan tetap: ambil barang dulu, bayar belakangan</td>
+<td>Kasbon — hanya untuk pelanggan tetap sesuai kesepakatan</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>Saat memilih <strong>Bayar Nanti</strong>, muncul kotak ungu pemberitahuan bahwa pesanan dicatat sebagai <strong>piutang (kasbon)</strong> dan status akan berubah <em>Lunas</em> setelah admin mengonfirmasi pembayaran.</p>
+</blockquote>
+<div class="shot"><span class="cam">📷</span><div><b>Placeholder tangkapan layar</b><br>Pilihan metode pembayaran + kotak pemberitahuan piutang</div></div>
+<h3>Langkah</h3>
+<ol>
+<li>Lengkapi formulir data pemesan.</li>
+<li>Pilih salah satu <strong>metode pembayaran</strong>.</li>
+<li>Periksa <strong>ringkasan pesanan</strong> di sisi kanan (item, subtotal, total).</li>
+<li>Klik <strong>Buat Pesanan &amp; Bayar</strong> (atau <strong>Buat Pesanan (Bayar Nanti)</strong> untuk piutang).</li>
+<li>Notifikasi <em>"Pesanan berhasil dibuat"</em> muncul; nomor pesanan berawalan <strong>SJ-</strong>.</li>
+<li>Anda diarahkan ke <strong>Halaman Pembayaran</strong>.</li>
+</ol>
+<div class="shot"><span class="cam">📷</span><div><b>Placeholder tangkapan layar</b><br>Notifikasi pesanan berhasil dibuat</div></div>
+<hr class="sep" />
+<h2>5. Halaman Pembayaran</h2>
+<p>Alamat: <code>/pembayaran/SJ-XXXXXXXX</code></p>
+<h3>Isi halaman</h3>
+<ul>
+<li><strong>Nomor pesanan</strong>, total tagihan, status pembayaran, dan metode yang dipilih.</li>
+<li><strong>Instruksi pembayaran</strong> sesuai metode:</li>
+<li><em>Transfer Bank</em>: nama bank, <strong>nomor Virtual Account</strong> dengan tombol <strong>Salin</strong>, batas waktu.</li>
+<li><em>QRIS</em>: gambar kode QR untuk di-scan.</li>
+<li><em>E-Wallet</em>: nama kanal dan tombol <strong>Bayar dengan …</strong> (aktif bila gateway terhubung).</li>
+<li><em>COD</em>: keterangan bayar saat barang diterima.</li>
+<li><em>Bayar Nanti</em>: keterangan piutang, menunggu konfirmasi admin.</li>
+<li>Tombol <strong>Cek Status</strong> untuk memeriksa apakah pembayaran sudah masuk.</li>
+<li>Kartu <strong>Ganti metode pembayaran</strong> — untuk berpindah metode sebelum dibayar (notifikasi <em>"Metode pembayaran diperbarui"</em>).</li>
+<li>Tombol <strong>Struk / PDF</strong>, <strong>Belanja Lagi</strong>, <strong>Kembali ke Beranda</strong>.</li>
+</ul>
+<blockquote>
+<p><strong>Mode Simulasi:</strong> Bila gateway pembayaran (Midtrans) belum diaktifkan, tampil tombol <strong>Simulasi Bayar (Sandbox)</strong> untuk menandai pembayaran sebagai lunas — dipakai untuk uji coba. Tombol ini hilang otomatis saat gateway aktif.</p>
+</blockquote>
+<div class="shot"><span class="cam">📷</span><div><b>Placeholder tangkapan layar</b><br>Halaman pembayaran Transfer Bank dengan nomor VA &amp; tombol Salin</div></div>
+<div class="shot"><span class="cam">📷</span><div><b>Placeholder tangkapan layar</b><br>Kartu "Ganti metode pembayaran"</div></div>
+<h3>Langkah membayar (Transfer Bank / VA)</h3>
+<ol>
+<li>Klik <strong>Salin</strong> pada nomor VA.</li>
+<li>Lakukan transfer melalui m-banking/ATM ke nomor VA tersebut sebesar total tagihan.</li>
+<li>Kembali ke halaman dan klik <strong>Cek Status</strong> → jika berhasil muncul <em>"Pembayaran diterima"</em> dan status berubah <strong>Lunas</strong>.</li>
+<li>Klik <strong>Struk / PDF</strong> untuk menyimpan bukti.</li>
+</ol>
+<hr class="sep" />
+<h2>6. Riwayat Pesanan, Detail Pesanan &amp; Struk</h2>
+<h3>Riwayat Pesanan — <code>/pesanan</code></h3>
+<ol>
+<li>Klik <strong>Pesanan</strong> di navbar (atau <strong>Cek Riwayat Pesanan</strong> di beranda).</li>
+<li>Jika belum "masuk", isi nama &amp; nomor WA yang dipakai saat checkout (lihat Bab 7).</li>
+<li>Daftar pesanan tampil: nomor <strong>SJ-</strong>, tanggal, total, <strong>status pesanan</strong> dan <strong>status pembayaran</strong>.</li>
+<li>Pesanan yang belum dibayar memiliki tombol <strong>Bayar Sekarang</strong>.</li>
+</ol>
+<div class="shot"><span class="cam">📷</span><div><b>Placeholder tangkapan layar</b><br>Riwayat Pesanan dengan beberapa pesanan</div></div>
+<h3>Detail Pesanan — <code>/pesanan/SJ-XXXXXXXX</code></h3>
+<p>Klik salah satu pesanan untuk melihat: data pengiriman, daftar item, ongkir, total, status, dan tombol <strong>Bayar</strong> (bila belum lunas) serta <strong>Struk</strong>.</p>
+<div class="shot"><span class="cam">📷</span><div><b>Placeholder tangkapan layar</b><br>Detail pesanan</div></div>
+<h3>Struk — <code>/struk/SJ-XXXXXXXX</code></h3>
+<p>Struk berlogo Semoyo Joyo berisi nama pelanggan, tabel item, total, dan status pembayaran. Tersedia tombol <strong>Cetak</strong> dan <strong>Unduh</strong> (PDF), serta <strong>Ke Riwayat Pesanan</strong>.</p>
+<div class="shot"><span class="cam">📷</span><div><b>Placeholder tangkapan layar</b><br>Struk pesanan</div></div>
+<hr class="sep" />
+<h2>7. Masuk sebagai Pelanggan</h2>
+<p>Alamat: <code>/masuk</code> — melalui tombol <strong>Masuk</strong> di navbar.</p>
+<ol>
+<li>Isi <strong>Nama / Nama usaha</strong> dan <strong>No. Telp / WA</strong> (<code>08xxxxxxxxxx</code>) yang sama seperti saat checkout.</li>
+<li>Klik <strong>Masuk</strong>.</li>
+<li>Riwayat pesanan atas nomor WA tersebut akan tampil di menu <strong>Pesanan</strong>.</li>
+</ol>
+<blockquote>
+<p>Tidak ada password untuk pelanggan; identitas berdasarkan nomor WA.</p>
+</blockquote>
+<div class="shot"><span class="cam">📷</span><div><b>Placeholder tangkapan layar</b><br>Halaman Masuk pelanggan</div></div>
+<hr class="sep" />
+<h1 class="part">BAGIAN C — PANEL ADMIN / OWNER (MINI ERP)</h1>
+<h2>8. Cara Login Staf (Admin / Owner)</h2>
+<p>Halaman login staf <strong>disembunyikan</strong> dari pelanggan — tidak ada tombol "Admin" di toko.</p>
+<h3>Langkah</h3>
+<ol>
+<li>Buka halaman login dengan <strong>salah satu</strong> cara:
+   - Ketik alamat <code>https://&lt;domain-toko&gt;/rahasia-admin</code>, <strong>atau</strong>
+   - Gulir ke bawah beranda, klik <strong>ikon gembok kecil transparan di pojok kanan bawah footer</strong>.</li>
+<li>Tampil kartu <strong>"Masuk Admin / Owner"</strong> berlogo Semoyo Joyo.</li>
+<li>Isi <strong>Username</strong> dan <strong>Password</strong>.
+   - Akun bawaan: <code>admin / admin123</code> (Admin), <code>owner / owner123</code> (Owner).</li>
+<li>Klik tombol biru <strong>Masuk</strong>.</li>
+<li>Anda diarahkan ke <strong>Dashboard</strong> (<code>/admin/dashboard</code>).</li>
+</ol>
+<div class="shot"><span class="cam">📷</span><div><b>Placeholder tangkapan layar</b><br>Ikon gembok di footer</div></div>
+<div class="shot"><span class="cam">📷</span><div><b>Placeholder tangkapan layar</b><br>Form "Masuk Admin / Owner"</div></div>
+<h3>Keluar</h3>
+<p>Klik <strong>Keluar</strong> di bagian bawah menu samping (desktop) atau di menu ☰ (ponsel).</p>
+<h3>Catatan penting</h3>
+<ul>
+<li>Membuka <code>/admin</code> tanpa login → otomatis diarahkan ke beranda toko (normal).</li>
+<li>Admin yang membuka menu khusus Owner akan dikembalikan ke Dashboard.</li>
+<li><strong>Segera ganti password bawaan</strong>: Owner → <strong>Pengaturan → Akun Staf</strong> (Bab 19.1).</li>
+</ul>
+<hr class="sep" />
+<h2>9. Mengenal Tata Letak Panel Admin</h2>
+<ul>
+<li><strong>Menu samping (kiri)</strong> pada desktop; pada ponsel gunakan tombol <strong>☰</strong>.</li>
+<li><strong>Titik merah</strong> di samping nama menu = ada data baru yang belum dilihat (mis. pesanan baru).</li>
+<li>Bagian bawah menu: nama akun &amp; peran (Admin/Owner), tombol <strong>Keluar</strong>.</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>Menu</th>
+<th>Fungsi</th>
+<th style="text-align: center;">Akses</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Dashboard</td>
+<td>Ringkasan KPI &amp; keuangan</td>
+<td style="text-align: center;">Semua</td>
+</tr>
+<tr>
+<td>Pesanan</td>
+<td>Kelola pesanan pelanggan</td>
+<td style="text-align: center;">Semua</td>
+</tr>
+<tr>
+<td>Piutang</td>
+<td>Kasbon/bayar nanti yang belum lunas</td>
+<td style="text-align: center;">Semua</td>
+</tr>
+<tr>
+<td>Pengeluaran</td>
+<td>Biaya operasional</td>
+<td style="text-align: center;">Semua</td>
+</tr>
+<tr>
+<td>Produk</td>
+<td>Katalog &amp; harga</td>
+<td style="text-align: center;">Semua</td>
+</tr>
+<tr>
+<td>Stok Barang</td>
+<td>Stok masuk/keluar &amp; riwayat</td>
+<td style="text-align: center;">Semua</td>
+</tr>
+<tr>
+<td>Kategori</td>
+<td>Kelola kategori</td>
+<td style="text-align: center;">Semua</td>
+</tr>
+<tr>
+<td>Laporan</td>
+<td>Laporan penjualan + Excel/PDF</td>
+<td style="text-align: center;">🔒 Owner</td>
+</tr>
+<tr>
+<td>Audit Log</td>
+<td>Jejak aktivitas staf</td>
+<td style="text-align: center;">🔒 Owner</td>
+</tr>
+<tr>
+<td>Pengaturan</td>
+<td>Akun, profil toko, pelanggan, sinkronisasi</td>
+<td style="text-align: center;">🔒 Owner</td>
+</tr>
+</tbody>
+</table>
+<div class="shot"><span class="cam">📷</span><div><b>Placeholder tangkapan layar</b><br>Menu samping panel admin (versi Owner)</div></div>
+<hr class="sep" />
+<h2>10. Dashboard</h2>
+<p>Alamat: <code>/admin/dashboard</code></p>
+<h3>Kartu KPI (semua peran)</h3>
+<p><strong>Pesanan Hari Ini · Total Pesanan · Menunggu Pembayaran · Pelanggan · Produk · Kategori · Stok Menipis</strong></p>
+<h3>Kartu Keuangan · Laba/Rugi 🔒 (Owner)</h3>
+<p><strong>Pendapatan (Omzet) · Total Modal (HPP) · Laba · Margin · Pengeluaran · Nilai Stok (Modal)</strong></p>
+<blockquote>
+<p>Definisi "terjual": pesanan <strong>Lunas</strong>, atau <strong>COD/Piutang yang statusnya Selesai</strong>, dan tidak dibatalkan.
+<strong>Laba Bersih = Omzet − HPP − Pengeluaran.</strong></p>
+</blockquote>
+<h3>Panel lain</h3>
+<ul>
+<li><strong>Status Pesanan</strong>: jumlah per status (Baru, Diproses, Dikirim, Selesai, Dibatalkan).</li>
+<li><strong>Pesanan Terbaru</strong>: tabel No. Pesanan, Pelanggan, Pembayaran, Status, Total, Aksi (klik untuk membuka detail di menu Pesanan).</li>
+<li><strong>Laba per Produk (Top 10)</strong> 🔒: Produk, Terjual, Omzet, Modal, Laba, Margin.</li>
+</ul>
+<div class="shot"><span class="cam">📷</span><div><b>Placeholder tangkapan layar</b><br>Dashboard Owner lengkap</div></div>
+<div class="shot"><span class="cam">📷</span><div><b>Placeholder tangkapan layar</b><br>Dashboard Admin (tanpa kartu keuangan)</div></div>
+<hr class="sep" />
+<h2>11. Pesanan</h2>
+<p>Alamat: <code>/admin/pesanan</code></p>
+<h3>Tampilan</h3>
+<ul>
+<li>Filter <strong>status pesanan</strong> dan <strong>status pembayaran</strong>, kotak <strong>"Cari no. pesanan / nama / telp..."</strong>.</li>
+<li>Tabel: <strong>No. Pesanan · Pelanggan · Metode · Pembayaran · Status · Total · Aksi</strong>.</li>
+</ul>
+<div class="shot"><span class="cam">📷</span><div><b>Placeholder tangkapan layar</b><br>Daftar pesanan</div></div>
+<h3>11.1 Melihat detail pesanan</h3>
+<p>Klik baris pesanan → panel geser kanan menampilkan: data pelanggan (nama, telepon, alamat, catatan), kotak <strong>Pembayaran</strong> (metode, referensi, waktu lunas), daftar <strong>Item</strong>, ongkir &amp; total, serta pilihan <strong>Status Pesanan</strong>.</p>
+<div class="shot"><span class="cam">📷</span><div><b>Placeholder tangkapan layar</b><br>Panel detail pesanan</div></div>
+<h3>11.2 Mengubah status pesanan</h3>
+<ol>
+<li>Di panel detail, pada bagian <strong>Status Pesanan</strong>, pilih: <strong>Baru → Diproses → Dikirim → Selesai</strong> (atau <strong>Dibatalkan</strong>).</li>
+<li>Notifikasi <em>"Status diperbarui"</em>.</li>
+<li>Catatan otomatis:
+   - <strong>Dibatalkan</strong> → stok item dikembalikan otomatis.
+   - <strong>Selesai</strong> pada pesanan COD/Piutang → mulai dihitung sebagai penjualan.</li>
+</ol>
+<h3>11.3 Mengedit data pesanan</h3>
+<ol>
+<li>Klik tombol <strong>Edit</strong> di panel detail.</li>
+<li>Ubah: <strong>Nama Pelanggan</strong>, <strong>No. Telp/WA</strong>, <strong>Alamat</strong>, <strong>Catatan</strong>, <strong>Ongkir (Rp)</strong>, <strong>Status Pembayaran</strong>, <strong>Status Pesanan</strong>.</li>
+<li>Klik <strong>Simpan</strong> → <em>"Data pesanan diperbarui"</em>.
+   - Validasi: nama minimal 2 karakter, alamat minimal 5 karakter.</li>
+</ol>
+<div class="shot"><span class="cam">📷</span><div><b>Placeholder tangkapan layar</b><br>Form edit pesanan</div></div>
+<h3>11.4 Menandai pesanan lunas (pembayaran diterima manual)</h3>
+<ol>
+<li>Di kotak <strong>Pembayaran</strong> klik <strong>Tandai Lunas (pembayaran diterima)</strong> — tampil untuk pesanan yang belum lunas &amp; tidak dibatalkan.</li>
+<li>Pilih <strong>Diterima melalui</strong> (Tunai / Transfer Bank / QRIS / E-Wallet / Lainnya), isi catatan (mis. <em>"Tunai diterima di gudang"</em>).</li>
+<li>Klik <strong>Tandai Lunas</strong>.</li>
+</ol>
+<h3>11.5 Menghapus pesanan</h3>
+<ol>
+<li>Klik ikon <strong>hapus (🗑)</strong> → dialog <em>"Hapus pesanan …?"</em>.</li>
+<li>Konfirmasi <strong>Hapus</strong>. Stok item dikembalikan otomatis, aksi tercatat di Audit Log.</li>
+</ol>
+<hr class="sep" />
+<h2>12. Piutang (Bayar Nanti)</h2>
+<p>Alamat: <code>/admin/piutang</code></p>
+<h3>12.1 Pengertian</h3>
+<p>Piutang = pesanan yang barangnya diambil dulu, dibayar belakangan (kasbon). Muncul bila pelanggan memilih <strong>Bayar Nanti</strong> saat checkout, atau admin mengubah status pembayaran pesanan menjadi <strong>Piutang</strong>. Piutang <strong>belum dihitung sebagai penjualan</strong> sampai <strong>Lunas</strong>.</p>
+<h3>12.2 Kartu ringkasan</h3>
+<table>
+<thead>
+<tr>
+<th>Kartu</th>
+<th>Arti</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Total Piutang Berjalan</strong> (ungu)</td>
+<td>Total rupiah &amp; jumlah pesanan belum dibayar</td>
+</tr>
+<tr>
+<td><strong>Pelanggan Berpiutang</strong></td>
+<td>Jumlah pelanggan yang masih menunggak</td>
+</tr>
+<tr>
+<td><strong>Lebih dari 14 Hari</strong></td>
+<td>Pesanan menunggak &gt; 14 hari — perlu ditagih segera (kartu memerah bila ada)</td>
+</tr>
+<tr>
+<td><strong>Piutang Sudah Dilunasi</strong> (hijau)</td>
+<td>Histori total yang sudah dibayar</td>
+</tr>
+</tbody>
+</table>
+<div class="shot"><span class="cam">📷</span><div><b>Placeholder tangkapan layar</b><br>Halaman Piutang — 4 kartu ringkasan</div></div>
+<h3>12.3 Panel Rekap per Pelanggan &amp; Daftar Pesanan Piutang</h3>
+<ul>
+<li><strong>Rekap per Pelanggan</strong> (kiri): nama, telepon, jumlah pesanan, umur tagihan terlama, total.</li>
+<li><strong>Daftar Pesanan Piutang</strong> (kanan): <strong>No. Pesanan · Pelanggan · Umur · Status · Tagihan · Aksi</strong>.</li>
+<li>Warna <strong>Umur</strong>: abu-abu (≤7 hari), kuning (8–14 hari), <strong>merah (&gt;14 hari)</strong>.</li>
+<li>Kotak <strong>"Cari no. pesanan / nama / telp..."</strong> menyaring otomatis.</li>
+</ul>
+<div class="shot"><span class="cam">📷</span><div><b>Placeholder tangkapan layar</b><br>Rekap per pelanggan &amp; tabel piutang dengan badge umur merah</div></div>
+<h3>12.4 Melihat detail</h3>
+<p>Klik baris atau ikon <strong>mata (Detail)</strong> → panel kanan: status, data pelanggan, <strong>metode awal</strong>, item, ongkir, <strong>Total Tagihan</strong>, tombol <strong>Tandai Lunas</strong>.</p>
+<div class="shot"><span class="cam">📷</span><div><b>Placeholder tangkapan layar</b><br>Panel detail piutang</div></div>
+<h3>12.5 Menandai Lunas — langkah utama</h3>
+<ol>
+<li>Klik tombol hijau <strong>✔ Tandai Lunas</strong> di baris pesanan (atau di panel detail).</li>
+<li>Dialog <strong>"Konfirmasi Pelunasan"</strong> menampilkan No. Pesanan, nama, dan nominal — <strong>periksa kembali</strong>.</li>
+<li>Pilih <strong>Diterima melalui *</strong>: Tunai / Transfer Bank / QRIS / E-Wallet / Lainnya.</li>
+<li>Isi <strong>Catatan</strong> (disarankan), mis. <em>"Transfer BCA 09/09, diterima oleh Budi"</em>.</li>
+<li>Klik <strong>Tandai Lunas</strong> → notifikasi <em>"Piutang SJ-… ditandai LUNAS"</em>.</li>
+</ol>
+<p><strong>Efek otomatis:</strong> status pembayaran → <strong>Lunas</strong>; tercatat sebagai transaksi pembayaran manual + <strong>Audit Log</strong> (<code>settle</code>); masuk perhitungan penjualan di Dashboard &amp; Laporan (bila status pesanan Selesai).</p>
+<blockquote>
+<p>⚠️ Pelunasan tidak bisa dibatalkan dari halaman Piutang. Pastikan uang sudah benar-benar diterima.</p>
+</blockquote>
+<div class="shot"><span class="cam">📷</span><div><b>Placeholder tangkapan layar</b><br>Dialog Konfirmasi Pelunasan</div></div>
+<div class="shot"><span class="cam">📷</span><div><b>Placeholder tangkapan layar</b><br>Notifikasi "ditandai LUNAS" &amp; tabel setelah pelunasan</div></div>
+<h3>12.6 Praktik baik</h3>
+<ul>
+<li>Cek kartu <strong>Lebih dari 14 Hari</strong> setiap pagi; hubungi pelanggan dari <strong>Rekap per Pelanggan</strong>.</li>
+<li>Selalu isi catatan pelunasan (bank, tanggal, penerima).</li>
+<li>🔒 Owner: lihat piutang per pelanggan &amp; segmen di <strong>Pengaturan → Database Pelanggan</strong>.</li>
+</ul>
+<hr class="sep" />
+<h2>13. Pengeluaran</h2>
+<p>Alamat: <code>/admin/pengeluaran</code></p>
+<h3>13.1 Fungsi</h3>
+<p>Mencatat biaya operasional. Semua pengeluaran <strong>mengurangi laba bersih</strong> di Dashboard (Owner) dan Laporan.</p>
+<h3>13.2 Filter &amp; ringkasan</h3>
+<ul>
+<li><strong>Periode</strong>: tombol cepat <strong>Hari Ini · 7 Hari · Bulan Ini · Bulan Lalu · Tahun Ini</strong> (default Bulan Ini) atau tanggal mulai/akhir manual; dropdown <strong>kategori</strong>; kotak <strong>"Cari keterangan..."</strong>.</li>
+<li>Kartu: <strong>Total Pengeluaran</strong> (biru, + jumlah transaksi), <strong>Ongkos Angkut / Kirim</strong>, <strong>Per Kategori</strong> (4 terbesar dengan persentase).</li>
+<li>Tabel <strong>Daftar Pengeluaran</strong>: <strong>Tanggal · Keterangan · Kategori · Bayar · Nominal · Aksi</strong> + baris <strong>TOTAL</strong>.</li>
+</ul>
+<div class="shot"><span class="cam">📷</span><div><b>Placeholder tangkapan layar</b><br>Halaman Pengeluaran — filter, kartu, tabel</div></div>
+<h3>13.3 Mencatat pengeluaran baru</h3>
+<ol>
+<li>Klik <strong>+ Catat Pengeluaran</strong> (kanan atas).</li>
+<li>Isi formulir:</li>
+</ol>
+<table>
+<thead>
+<tr>
+<th>Kolom</th>
+<th style="text-align: center;">Wajib</th>
+<th>Keterangan</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Tanggal</strong></td>
+<td style="text-align: center;">✔</td>
+<td>Default hari ini; bisa dimundurkan</td>
+</tr>
+<tr>
+<td><strong>Kategori</strong></td>
+<td style="text-align: center;">✔</td>
+<td>Ongkos Angkut / Kirim · Operasional · Gaji / Upah · Sewa · Listrik &amp; Air · Perlengkapan · Pembelian Barang · Lainnya</td>
+</tr>
+<tr>
+<td><strong>Keterangan</strong></td>
+<td style="text-align: center;">✔</td>
+<td>Min. 2 karakter, mis. <em>"Ongkos angkut beras 25 sak dari gudang"</em></td>
+</tr>
+<tr>
+<td><strong>Nominal (Rp)</strong></td>
+<td style="text-align: center;">✔</td>
+<td>Angka bulat &gt; 0; pratinjau format rupiah tampil di bawah kolom</td>
+</tr>
+<tr>
+<td><strong>Dibayar via</strong></td>
+<td style="text-align: center;">–</td>
+<td>Tunai (default) / Transfer</td>
+</tr>
+<tr>
+<td><strong>Referensi</strong></td>
+<td style="text-align: center;">–</td>
+<td>No. nota / nama produk / supplier</td>
+</tr>
+<tr>
+<td><strong>Catatan</strong></td>
+<td style="text-align: center;">–</td>
+<td>Keterangan tambahan</td>
+</tr>
+</tbody>
+</table>
+<ol start="3">
+<li>Klik <strong>Simpan</strong> → <em>"Pengeluaran dicatat"</em>.</li>
+</ol>
+<div class="shot"><span class="cam">📷</span><div><b>Placeholder tangkapan layar</b><br>Form Catat Pengeluaran</div></div>
+<h3>13.4 Mengedit</h3>
+<p>Klik ikon <strong>pensil</strong> → ubah → <strong>Simpan</strong> → <em>"Pengeluaran diperbarui"</em>.</p>
+<h3>13.5 Menghapus 🔒 (Owner)</h3>
+<p>Klik ikon <strong>tempat sampah</strong> → dialog <em>"Hapus pengeluaran ini?"</em> → <strong>Hapus</strong>. Laba bersih dihitung ulang.</p>
+<div class="shot"><span class="cam">📷</span><div><b>Placeholder tangkapan layar</b><br>Dialog konfirmasi hapus pengeluaran</div></div>
+<h3>13.6 Pengeluaran otomatis dari Stok Masuk</h3>
+<p>Saat <strong>Stok Barang → Tambah</strong>, isi kolom opsional <strong>"Biaya angkut / ongkos"</strong> → otomatis tercatat di Pengeluaran (kategori Ongkos Angkut / Kirim) dengan tanda <em>"otomatis dari stok masuk"</em>. Jangan dicatat dua kali.</p>
+<hr class="sep" />
+<h2>14. Produk</h2>
+<p>Alamat: <code>/admin/produk</code></p>
+<h3>Tampilan</h3>
+<ul>
+<li>Kotak <strong>"Cari produk..."</strong>, filter <strong>Semua kategori</strong>, tombol <strong>+ Tambah Produk</strong>.</li>
+<li>Tabel: <strong>Produk · Kategori · Harga Beli · Harga Jual · Laba / Unit · Min. Order · Stok · Status (Aktif/Nonaktif) · Aksi</strong>.</li>
+</ul>
+<div class="shot"><span class="cam">📷</span><div><b>Placeholder tangkapan layar</b><br>Daftar produk</div></div>
+<h3>14.1 Menambah produk</h3>
+<ol>
+<li>Klik <strong>+ Tambah Produk</strong>.</li>
+<li>Isi formulir:</li>
+</ol>
+<table>
+<thead>
+<tr>
+<th>Kolom</th>
+<th style="text-align: center;">Wajib</th>
+<th>Keterangan</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Nama Produk</strong></td>
+<td style="text-align: center;">✔</td>
+<td></td>
+</tr>
+<tr>
+<td><strong>Kategori</strong></td>
+<td style="text-align: center;">✔</td>
+<td>Pilih dari dropdown</td>
+</tr>
+<tr>
+<td><strong>Deskripsi Produk</strong></td>
+<td style="text-align: center;">–</td>
+<td>Dibaca pembeli di beranda: kualitas, asal, kemasan, cara simpan</td>
+</tr>
+<tr>
+<td><strong>Harga Jual (Rp)</strong></td>
+<td style="text-align: center;">✔</td>
+<td>Harga ke pelanggan</td>
+</tr>
+<tr>
+<td><strong>Harga Beli / Modal (Rp)</strong></td>
+<td style="text-align: center;">–</td>
+<td>Untuk hitung laba &amp; HPP (default 80% harga jual bila kosong)</td>
+</tr>
+<tr>
+<td><strong>Satuan</strong></td>
+<td style="text-align: center;">✔</td>
+<td>kg, pack, sak, karton, liter, ikat, dll.</td>
+</tr>
+<tr>
+<td><strong>Min. Order</strong></td>
+<td style="text-align: center;">–</td>
+<td>Jumlah minimal per pesanan</td>
+</tr>
+<tr>
+<td><strong>Stok</strong></td>
+<td style="text-align: center;">–</td>
+<td>Stok awal</td>
+</tr>
+<tr>
+<td><strong>Gambar Produk</strong></td>
+<td style="text-align: center;">–</td>
+<td>Unggah file (→ <em>"Gambar diunggah"</em>) atau tempel <strong>URL gambar</strong></td>
+</tr>
+<tr>
+<td><strong>Aktif</strong> (switch)</td>
+<td style="text-align: center;">–</td>
+<td>Nonaktif = disembunyikan dari katalog</td>
+</tr>
+</tbody>
+</table>
+<ol start="3">
+<li>Klik <strong>Simpan</strong> → <em>"Produk ditambahkan"</em>.</li>
+</ol>
+<div class="shot"><span class="cam">📷</span><div><b>Placeholder tangkapan layar</b><br>Form Tambah Produk</div></div>
+<h3>14.2 Mengedit / menonaktifkan</h3>
+<p>Klik ikon <strong>pensil</strong> → ubah data (mis. matikan switch <strong>Aktif</strong> untuk menyembunyikan dari katalog) → <strong>Simpan</strong> → <em>"Produk diperbarui"</em>. Perubahan stok dari form ini otomatis tercatat di riwayat stok.</p>
+<h3>14.3 Menghapus</h3>
+<p>Ikon <strong>tempat sampah</strong> → <em>"Hapus produk?"</em> → <strong>Hapus</strong> → <em>"Produk dihapus"</em>.</p>
+<hr class="sep" />
+<h2>15. Stok Barang</h2>
+<p>Alamat: <code>/admin/stok</code></p>
+<h3>Ringkasan</h3>
+<p>Kartu: <strong>Total Produk · Total Unit Tersedia · Menipis / Habis · Nilai Stok (Modal)</strong> 🔒.
+Filter status: <strong>Aman · Menipis · Habis</strong>; kotak <strong>"Cari barang..."</strong>.</p>
+<h3>Tabel</h3>
+<p><strong>Barang · Kategori · Sisa Stok · Min. Order · Status · Nilai Stok · Mutasi Terakhir · Aksi</strong></p>
+<div class="shot"><span class="cam">📷</span><div><b>Placeholder tangkapan layar</b><br>Halaman Stok Barang</div></div>
+<h3>15.1 Tambah stok (barang masuk)</h3>
+<ol>
+<li>Klik <strong>+ Tambah</strong> (hijau) pada baris barang.</li>
+<li>Isi <strong>Jumlah</strong>, <strong>Catatan</strong> (opsional).</li>
+<li>Opsional: <strong>Biaya angkut / ongkos</strong> — Nominal (Rp) + keterangan → otomatis masuk Pengeluaran.</li>
+<li><strong>Simpan</strong>. Riwayat stok bertambah dengan sumber <em>manual/stock_in</em>.</li>
+</ol>
+<div class="shot"><span class="cam">📷</span><div><b>Placeholder tangkapan layar</b><br>Dialog Tambah Stok dengan kolom biaya angkut</div></div>
+<h3>15.2 Kurangi stok (rusak/hilang/dipakai)</h3>
+<p>Klik <strong>− Kurangi</strong> (kuning) → isi jumlah &amp; catatan → <strong>Simpan</strong>.</p>
+<h3>15.3 Edit / set stok manual</h3>
+<p>Klik ikon <strong>pensil</strong> → masukkan angka stok akhir → <strong>Simpan</strong> (sistem mencatat selisihnya).</p>
+<h3>15.4 Riwayat mutasi</h3>
+<p>Klik ikon <strong>jam (Riwayat)</strong> → daftar pergerakan: tanggal, jenis (masuk/keluar), jumlah, stok sebelum/sesudah, sumber (checkout, batal, hapus pesanan, manual), catatan, petugas.</p>
+<div class="shot"><span class="cam">📷</span><div><b>Placeholder tangkapan layar</b><br>Riwayat mutasi stok satu produk</div></div>
+<h3>15.5 Hapus produk dari stok 🔒 (Owner)</h3>
+<p>Ikon <strong>tempat sampah</strong> → <em>"Hapus produk dari stok?"</em> → <strong>Hapus</strong> → <em>"Produk dihapus dari stok &amp; katalog"</em>.</p>
+<blockquote>
+<p>Stok berkurang <strong>otomatis</strong> saat pelanggan checkout dan <strong>kembali otomatis</strong> saat pesanan dibatalkan/dihapus.</p>
+</blockquote>
+<hr class="sep" />
+<h2>16. Kategori</h2>
+<p>Alamat: <code>/admin/kategori</code></p>
+<ul>
+<li>Tabel: <strong>Kategori · Deskripsi · Produk (jumlah) · Urutan · Status · Aksi</strong>.</li>
+<li><strong>+ Tambah Kategori</strong>: <strong>Nama Kategori*</strong>, <strong>Deskripsi</strong>, <strong>URL Gambar</strong> (<code>https://...</code>), <strong>Urutan</strong> (posisi di beranda), status aktif → <strong>Simpan</strong> → <em>"Kategori ditambahkan"</em>.</li>
+<li><strong>Edit</strong> (pensil) → <em>"Kategori diperbarui"</em>; <strong>Hapus</strong> (tempat sampah) → <em>"Hapus kategori?"</em> → <em>"Kategori dihapus"</em> (pastikan tidak ada produk di dalamnya).</li>
+</ul>
+<div class="shot"><span class="cam">📷</span><div><b>Placeholder tangkapan layar</b><br>Daftar kategori &amp; form tambah kategori</div></div>
+<hr class="sep" />
+<h2>17. Laporan Penjualan 🔒</h2>
+<p>Alamat: <code>/admin/laporan</code> — hanya Owner.</p>
+<h3>17.1 Memilih periode</h3>
+<ul>
+<li>Tombol cepat: <strong>Hari Ini · 7 Hari Terakhir · 30 Hari Terakhir · Bulan Ini · Bulan Lalu · Tahun Ini</strong>.</li>
+<li>Atau isi <strong>Tanggal Mulai</strong> &amp; <strong>Tanggal Akhir</strong> (WIB). Jika terbalik muncul <em>"Rentang tanggal tidak valid"</em>.</li>
+</ul>
+<div class="shot"><span class="cam">📷</span><div><b>Placeholder tangkapan layar</b><br>Filter periode laporan</div></div>
+<h3>17.2 Ringkasan</h3>
+<p><strong>Total Pendapatan Kotor · Total Modal (HPP) · Pengeluaran Periode · Total Penjualan/Laba (+margin) · Pesanan Terjual</strong></p>
+<h3>17.3 Grafik &amp; tabel</h3>
+<ul>
+<li><strong>Tren Harian · Pendapatan vs Laba</strong> (grafik).</li>
+<li><strong>Produk Terjual pada Periode Ini</strong>: No, Produk, Qty, Omzet, Modal, Laba.</li>
+<li><strong>Detail Pesanan</strong>: <strong>No. Pesanan · Tanggal · Nama Pembeli · Pembayaran · Item · Total · Modal (HPP) · Laba · Margin</strong> + baris TOTAL. Klik judul kolom untuk <strong>mengurutkan</strong>.</li>
+</ul>
+<div class="shot"><span class="cam">📷</span><div><b>Placeholder tangkapan layar</b><br>Ringkasan, grafik, tabel detail laporan</div></div>
+<h3>17.4 Mengunduh laporan</h3>
+<ol>
+<li>Klik <strong>Download Excel</strong> (sheet Ringkasan berlogo, Detail Pesanan, Produk Terjual; format Rupiah, filter otomatis, rumus total) atau <strong>Download PDF</strong> (A4 landscape, kop logo, tanda tangan owner).</li>
+<li>Notifikasi <em>"Excel/PDF berhasil diunduh"</em>. Setiap unduhan tercatat di Audit Log (<em>Unduh Laporan</em>).</li>
+</ol>
+<div class="shot"><span class="cam">📷</span><div><b>Placeholder tangkapan layar</b><br>Tombol Download Excel/PDF &amp; contoh file PDF</div></div>
+<hr class="sep" />
+<h2>18. Audit Log 🔒</h2>
+<p>Alamat: <code>/admin/audit-log</code> — hanya Owner.</p>
+<ul>
+<li>Tabel: <strong>Waktu · Akun · Aksi · Objek · Keterangan</strong>.</li>
+<li>Filter jenis aksi: <strong>Masuk · Tambah · Ubah · Hapus · Status · Stok · Unduh Laporan</strong> (juga <em>settle</em> &amp; <em>sync</em>).</li>
+<li>Kotak <strong>"Cari aktivitas / nama produk / no. pesanan..."</strong>, tombol <strong>Muat ulang</strong>.</li>
+</ul>
+<p>Gunakan untuk menelusuri siapa mengubah apa dan kapan (mis. siapa menandai piutang lunas, siapa menghapus produk).</p>
+<div class="shot"><span class="cam">📷</span><div><b>Placeholder tangkapan layar</b><br>Halaman Audit Log</div></div>
+<hr class="sep" />
+<h2>19. Pengaturan 🔒</h2>
+<p>Alamat: <code>/admin/pengaturan</code> — hanya Owner. Terdiri dari 4 tab.</p>
+<h3>19.1 Tab <strong>Akun Staf</strong></h3>
+<ul>
+<li>Kartu <strong>Akun Admin &amp; Owner</strong>: tabel <strong>Akun · Username (ID Login) · Role · Aksi</strong>.</li>
+<li><strong>Ubah ID / Password</strong>: isi <strong>Nama tampilan</strong>, <strong>Username (ID login)</strong>, <strong>Password baru</strong>, lalu <strong>Konfirmasi password Owner</strong> (wajib) → <strong>Simpan</strong>.</li>
+<li><strong>+ Tambah Admin</strong>: <strong>Nama*</strong>, <strong>Username*</strong>, <strong>Password*</strong>, <strong>Konfirmasi*</strong> (password Owner) → <strong>Simpan</strong>.</li>
+<li><strong>Hapus akun admin</strong>: ikon tempat sampah → konfirmasi.</li>
+</ul>
+<blockquote>
+<p>Ini tempat mengganti password bawaan <code>admin123</code> / <code>owner123</code>.</p>
+</blockquote>
+<div class="shot"><span class="cam">📷</span><div><b>Placeholder tangkapan layar</b><br>Tab Akun Staf &amp; dialog Ubah Kredensial</div></div>
+<h3>19.2 Tab <strong>Profil Toko</strong></h3>
+<ul>
+<li><strong>Identitas &amp; Kontak Toko</strong>: nama, <strong>Deskripsi Singkat</strong>, telepon/WA, email, <strong>Alamat Lengkap</strong> — tampil di footer toko &amp; struk.</li>
+<li><strong>Rekening Pembayaran (internal)</strong>: <strong>Bank</strong>, <strong>No. Rekening</strong>, <strong>Atas Nama</strong> — catatan internal untuk staf.</li>
+<li>Klik <strong>Simpan</strong>.</li>
+</ul>
+<div class="shot"><span class="cam">📷</span><div><b>Placeholder tangkapan layar</b><br>Tab Profil Toko</div></div>
+<h3>19.3 Tab <strong>Database Pelanggan</strong></h3>
+<ul>
+<li>Kartu: <strong>Total Pelanggan · Pelanggan Tetap (≥3 pesanan) · Baru Bulan Ini · Rata-rata belanja</strong>.</li>
+<li><strong>Daftar Pelanggan</strong>: <strong>Pelanggan · Pesanan · Total Belanja · Piutang · Transaksi Terakhir · Segmen</strong> (<em>Pelanggan Tetap / Aktif / Baru / Pasif</em>).</li>
+<li>Berguna untuk menentukan siapa yang boleh memakai <strong>Bayar Nanti</strong>.</li>
+</ul>
+<div class="shot"><span class="cam">📷</span><div><b>Placeholder tangkapan layar</b><br>Tab Database Pelanggan</div></div>
+<h3>19.4 Tab <strong>Sinkronisasi Data</strong></h3>
+<ul>
+<li>Kartu <strong>Angka Tersinkron (sumber tunggal)</strong>: Omzet, Modal (HPP), Laba Kotor, Laba Bersih, Nilai Stok — angka final yang dipakai Dashboard &amp; Laporan.</li>
+<li>Tombol <strong>Jalankan Sinkronisasi</strong> → dialog <em>"Jalankan sinkronisasi data?"</em> → <strong>Ya</strong>.</li>
+<li><strong>Hasil Pemeriksaan</strong>: daftar perbaikan otomatis (subtotal item, total pesanan, waktu lunas, snapshot HPP, status COD/piutang) dan <strong>anomali stok</strong> (hanya dilaporkan, tidak diubah).</li>
+<li>Hasil terakhir tersimpan di Audit Log (<code>sync</code>).</li>
+</ul>
+<p>Jalankan bila angka Dashboard/Laporan terasa tidak konsisten.</p>
+<div class="shot"><span class="cam">📷</span><div><b>Placeholder tangkapan layar</b><br>Tab Sinkronisasi Data &amp; hasil pemeriksaan</div></div>
+<hr class="sep" />
+<h1 class="part">BAGIAN D — LAMPIRAN</h1>
+<h2>20. Alur Kerja Harian yang Disarankan</h2>
+<table>
+<thead>
+<tr>
+<th>Waktu</th>
+<th>Aktivitas</th>
+<th>Menu</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Pagi</td>
+<td>Cek pesanan baru, ubah status <strong>Diproses → Dikirim → Selesai</strong></td>
+<td>Pesanan</td>
+</tr>
+<tr>
+<td>Pagi</td>
+<td>Cek piutang <strong>&gt; 14 hari</strong>, hubungi pelanggan</td>
+<td>Piutang</td>
+</tr>
+<tr>
+<td>Barang datang</td>
+<td><strong>Tambah</strong> stok + isi biaya angkut</td>
+<td>Stok Barang</td>
+</tr>
+<tr>
+<td>Ada biaya</td>
+<td><strong>Catat Pengeluaran</strong> (listrik, gaji, dll.)</td>
+<td>Pengeluaran</td>
+</tr>
+<tr>
+<td>Pelanggan bayar kasbon</td>
+<td><strong>Tandai Lunas</strong> + catatan</td>
+<td>Piutang</td>
+</tr>
+<tr>
+<td>Harga berubah</td>
+<td>Ubah <strong>Harga Jual / Harga Beli</strong></td>
+<td>Produk</td>
+</tr>
+<tr>
+<td>Akhir hari / bulan 🔒</td>
+<td>Lihat laporan, <strong>Download Excel/PDF</strong></td>
+<td>Laporan</td>
+</tr>
+<tr>
+<td>Berkala 🔒</td>
+<td>Cek <strong>Audit Log</strong>, jalankan <strong>Sinkronisasi Data</strong></td>
+<td>Audit Log, Pengaturan</td>
+</tr>
+</tbody>
+</table>
+<h2>21. Istilah &amp; Status</h2>
+<p><strong>Status Pesanan:</strong> Baru → Diproses → Dikirim → Selesai · Dibatalkan
+<strong>Status Pembayaran:</strong> Menunggu Pembayaran · Lunas · Gagal · Kedaluwarsa · Piutang
+<strong>Metode Pembayaran:</strong> COD (Bayar di Tempat) · Transfer Bank · QRIS · E-Wallet · Bayar Nanti (Piutang)
+<strong>HPP / Modal:</strong> harga beli × jumlah terjual. <strong>Laba Kotor:</strong> Omzet − HPP. <strong>Laba Bersih:</strong> Laba Kotor − Pengeluaran.
+<strong>Terjual:</strong> pesanan Lunas, atau COD/Piutang yang <strong>Selesai</strong>, dan tidak dibatalkan.
+<strong>Nomor pesanan:</strong> berawalan <strong>SJ-</strong>.</p>
+<h2>22. Pertanyaan Umum (FAQ)</h2>
+<p><strong>Pesanan piutang tidak masuk omzet?</strong> — Harus <strong>Tandai Lunas</strong> <em>dan</em> status pesanan <strong>Selesai</strong>.</p>
+<p><strong>Tidak ada tombol Hapus di Pengeluaran/Stok?</strong> — Hanya <strong>Owner</strong> yang bisa menghapus.</p>
+<p><strong>Salah menekan Tandai Lunas?</strong> — Owner memperbaiki via <strong>Pesanan → Edit → Status Pembayaran</strong>; tercatat di Audit Log.</p>
+<p><strong>Login staf gagal?</strong> — Pastikan di <code>/rahasia-admin</code> (bukan <code>/masuk</code>). Bila Owner sudah mengganti kredensial, gunakan yang baru.</p>
+<p><strong>Produk tidak tampil di beranda?</strong> — Cek switch <strong>Aktif</strong> di Produk dan pastikan kategorinya aktif.</p>
+<p><strong>Tombol "Simulasi Bayar" muncul di halaman pembayaran?</strong> — Gateway Midtrans belum diisi; aplikasi berjalan <strong>mode simulasi</strong>. Isi kunci Midtrans di server untuk pembayaran nyata.</p>
+<p><strong>Angka Dashboard terasa tidak sinkron?</strong> — Owner → <strong>Pengaturan → Sinkronisasi Data → Jalankan Sinkronisasi</strong>.</p>
+<hr class="sep" />
+<p><em>© Semoyo Joyo — Solusi Belanja Terpercaya. Dokumen internal untuk staf.</em></p></body></html>
