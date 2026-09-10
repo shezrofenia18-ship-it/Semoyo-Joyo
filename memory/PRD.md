@@ -66,6 +66,13 @@ Brand: Biru #0B4EA2 (primary), Kuning #F5C400 (aksen), Putih. Logo: frontend/pub
 - docker-compose.yml: tambah OWNER_USERNAME/OWNER_PASSWORD.
 - Workspace: repo di-import ulang, PG15 di-bundle ke /root/pg15, data /app/pgdata, 58 produk asli di-seed.
 
+## Impor ulang workspace (Sep 2026, commit a587231 "Update docker-compose.yml") - SELESAI
+- Repo di-clone ke /app (riwayat git dipertahankan, remote GitHub sama). Tidak ada perubahan kode/fitur.
+- PG15 dipasang via apt -> bundle /root/pg15, data baru /app/pgdata (ensure_postgres.sh, AUTO_START_LOCAL_PG=true).
+- backend/.env dibuat ulang: DATABASE_URL localhost, admin/admin123, owner/owner123, Midtrans kosong (SIMULASI).
+- Seed: 7 kategori, 38 dummy (auto) + seed_real_products.py -> 58 produk asli aktif, 33 dummy nonaktif. seed_sample_orders TIDAK dijalankan.
+- Verifikasi testing agent (iteration_7): 17/17 backend pass; UI home, login, 8 halaman owner, RBAC redirect OK.
+
 ## Tahap 4 (Sep 2026): UI Checkout, Akses Stealth, Piutang, Pengeluaran, RBAC + Pengaturan Owner, Sinkronisasi Data
 - Checkout: label "Nama / Nama usaha" (tanpa placeholder); halaman Masuk pelanggan ikut disesuaikan.
 - Akses staf stealth: banner "Portal Admin/Owner" & tombol navbar dihapus. Login staf hanya via URL `/rahasia-admin` atau ikon gembok
