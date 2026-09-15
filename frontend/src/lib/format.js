@@ -20,11 +20,9 @@ export const formatDateOnly = (iso) => {
 export const daysSince = (iso) => (iso ? Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 86400000)) : 0);
 
 export const PAYMENT_METHOD_LABEL = {
-  cod: "COD (Bayar di Tempat)",
-  bank_transfer: "Transfer Bank",
-  qris: "QRIS",
-  ewallet: "E-Wallet",
+  cash: "Cash (Tunai)",
   piutang: "Bayar Nanti (Piutang)",
+  transfer_va: "Transfer VA (Travoy Pay)",
 };
 
 export const PAYMENT_STATUS_LABEL = {
@@ -32,7 +30,6 @@ export const PAYMENT_STATUS_LABEL = {
   paid: "Lunas",
   failed: "Gagal",
   expired: "Kedaluwarsa",
-  cod: "Bayar di Tempat",
   piutang: "Belum Bayar / Piutang",
 };
 
@@ -42,18 +39,6 @@ export const ORDER_STATUS_LABEL = {
   dikirim: "Dikirim",
   selesai: "Selesai",
   dibatalkan: "Dibatalkan",
-};
-
-export const CHANNEL_LABEL = {
-  bca: "BCA",
-  bni: "BNI",
-  bri: "BRI",
-  mandiri: "Mandiri",
-  permata: "Permata",
-  gopay: "GoPay",
-  shopeepay: "ShopeePay",
-  ovo: "OVO",
-  dana: "DANA",
 };
 
 export const EXPENSE_CATEGORY_LABEL = {

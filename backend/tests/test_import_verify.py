@@ -38,7 +38,7 @@ def test_health(s):
     j = r.json()
     assert j["status"] == "ok"
     assert j["db_connected"] is True
-    assert j["payment_mode"] == "simulation"
+    assert j["payment_mode"] == "travoy_placeholder"
 
 
 # ---------- Public catalog ----------
@@ -66,7 +66,7 @@ def created_order(s):
         "full_name": f"TEST_{uuid.uuid4().hex[:6]}",
         "phone": "081234567890",
         "address": "Jl. Test No. 1, Jakarta",
-        "payment_method": "cod",
+        "payment_method": "cash",
         "items": [{"product_id": p["id"], "qty": max(1, p.get("min_order", 1))}],
     }
     r = s.post(f"{BASE_URL}/api/checkout", json=payload)

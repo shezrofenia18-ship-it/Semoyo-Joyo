@@ -12,7 +12,7 @@ Push seluruh folder proyek (`backend/`, `frontend/`, `docker-compose.yml`, `.env
    - `POSTGRES_PASSWORD`, `JWT_SECRET`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`
    - `APP_URL` = domain publik frontend, mis. `https://toko.domain.com`
    - `CORS_ORIGINS` = domain yang sama
-   - `MIDTRANS_SERVER_KEY` / `MIDTRANS_CLIENT_KEY` (kosongkan dulu = mode simulasi)
+   - `TRAVOY_API_KEY` / `TRAVOY_BASE_URL` / `TRAVOY_CALLBACK_TOKEN` (kosongkan dulu = Transfer VA mode placeholder)
 4. Set domain pada service **frontend** (port 80). Backend tidak perlu domain publik karena diakses via proxy `/api`.
 5. Deploy.
 
@@ -26,14 +26,16 @@ Push seluruh folder proyek (`backend/`, `frontend/`, `docker-compose.yml`, `.env
 - Login admin di `https://APP_URL/admin` dengan `ADMIN_USERNAME` / `ADMIN_PASSWORD`.
 - Seed data (7 kategori, 38 produk) otomatis dimasukkan saat database masih kosong.
 
-## 5. Mengaktifkan Midtrans (auto-cek pembayaran)
-1. Daftar di https://dashboard.midtrans.com → Settings → Access Keys.
-2. Isi `MIDTRANS_SERVER_KEY` dan `MIDTRANS_CLIENT_KEY` di env, redeploy backend.
-3. Di dashboard Midtrans → Settings → Configuration → **Payment Notification URL**:
-   `https://APP_URL/api/payments/midtrans/notification`
-4. Set `MIDTRANS_IS_PRODUCTION=true` saat siap produksi.
+## 5. Metode pembayaran & Travoy Pay (Transfer VA)
+Metode pembayaran yang tersedia di checkout:
+- **Cash (Tunai)** - pesanan langsung berstatus Lunas.
+- **Bayar Nanti** - pesanan berstatus Piutang dan masuk modul Piutang (dilunasi admin via "Tandai Lunas").
+- **Transfer VA (Travoy Pay)** - kerangka integrasi; aktif setelah dokumen API tersedia.
 
-Saat key kosong, sistem berjalan dalam **mode simulasi**: nomor VA/e-wallet dibuat lokal dan tersedia tombol *Simulasi Bayar* di halaman pembayaran (otomatis nonaktif saat key diisi).
+Mengaktifkan Travoy Pay nanti:
+1. Lengkapi implementasi `backend/payments/travoy.py` (create_va, get_status, verify_callback, map_status) sesuai dokumen API.
+2. Isi `TRAVOY_API_KEY`, `TRAVOY_BASE_URL`, `TRAVOY_CALLBACK_TOKEN` di env, redeploy backend.
+3. Daftarkan URL callback di dashboard Travoy Pay: `https://APP_URL/api/payments/travoy/notification`.
 
 ## 6. Backup
 Volume `pgdata` menyimpan database dan `uploads` menyimpan gambar produk yang diunggah admin. Backup rutin dengan `pg_dump` atau fitur backup Coolify.

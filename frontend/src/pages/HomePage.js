@@ -72,7 +72,7 @@ export default function HomePage() {
               <dl className="mt-8 grid grid-cols-3 gap-4 text-sm">
                 {[
                   { icon: Truck, t: "Kirim Terjadwal", d: "Pagi sebelum masak" },
-                  { icon: Clock3, t: "Auto-verifikasi", d: "Transfer & e-wallet" },
+                  { icon: Clock3, t: "Bayar Fleksibel", d: "Tunai atau bayar nanti" },
                   { icon: PackageSearch, t: "Min. Order Jelas", d: "Per satuan produk" },
                 ].map(({ icon: I, t, d }) => (
                   <div key={t} className="rounded-xl border bg-card p-3">

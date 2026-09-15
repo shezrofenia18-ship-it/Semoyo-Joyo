@@ -4,9 +4,9 @@ from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-PaymentMethod = Literal["cod", "bank_transfer", "qris", "ewallet", "piutang"]
+PaymentMethod = Literal["cash", "piutang", "transfer_va"]
 OrderStatus = Literal["baru", "diproses", "dikirim", "selesai", "dibatalkan"]
-PaymentStatus = Literal["pending", "paid", "failed", "expired", "cod", "piutang"]
+PaymentStatus = Literal["pending", "paid", "failed", "expired", "piutang"]
 
 
 class ORMModel(BaseModel):
@@ -91,7 +91,6 @@ class CheckoutIn(BaseModel):
     address: str = Field(min_length=5)
     notes: Optional[str] = None
     payment_method: PaymentMethod
-    payment_channel: Optional[str] = None  # bca/bni/bri/mandiri/permata | gopay/ovo/dana/shopeepay
     items: list[CheckoutItemIn] = Field(min_length=1)
 
     @field_validator("full_name", "address")
@@ -124,7 +123,6 @@ class OrderOut(ORMModel):
     shipping_fee: float
     total: float
     payment_method: str
-    payment_channel: Optional[str] = None
     payment_status: str
     order_status: str
     payment_ref: Optional[str] = None
@@ -145,17 +143,14 @@ class CheckoutOut(BaseModel):
 # ---------- Payments ----------
 class PaymentCreateIn(BaseModel):
     payment_method: Optional[PaymentMethod] = None
-    payment_channel: Optional[str] = None
 
 
 class PaymentInstructionOut(BaseModel):
     order_number: str
     payment_method: str
-    payment_channel: Optional[str] = None
     payment_status: str
     amount: float
-    provider: str  # midtrans | simulation | manual
-    simulation: bool
+    provider: str  # cash | manual | travoy
     instructions: dict[str, Any]
 
 
@@ -313,7 +308,7 @@ class DashboardOut(BaseModel):
     # Piutang (semua staf boleh lihat - untuk penagihan)
     receivables_total: float = 0
     receivables_count: int = 0
-    # Keuangan (hanya pesanan lunas / COD selesai / piutang selesai) - Owner
+    # Keuangan (hanya pesanan lunas / piutang selesai) - Owner
     cost_paid: float = 0
     gross_profit: float = 0
     margin_pct: float = 0

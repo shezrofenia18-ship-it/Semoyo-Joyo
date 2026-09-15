@@ -44,19 +44,19 @@ async def main():
         await s.flush()
         order = Order(order_number="MBG-POC-" + str(id(s))[-6:], user_id=user.id, customer_name=user.full_name,
                       phone="0812", address="Jl. Test", subtotal=Decimal("312500"), total=Decimal("312500"),
-                      payment_method="bank_transfer", payment_payload={"mode": "simulation"})
+                      payment_method="transfer_va", payment_payload={"provider": "travoy"})
         s.add(order)
         await s.flush()
         s.add(OrderItem(order_id=order.id, product_id=prod.id, product_name=prod.name, unit="kg",
                         price=prod.price, qty=25, subtotal=Decimal("312500")))
-        s.add(PaymentTransaction(order_id=order.id, provider="simulation", method="bank_transfer",
+        s.add(PaymentTransaction(order_id=order.id, provider="travoy", method="transfer_va",
                                  status="pending", amount=Decimal("312500"), raw={"va": "123"}))
         await s.commit()
 
         res = await s.execute(select(Order).where(Order.id == order.id))
         o = res.scalar_one()
         assert o.items and o.items[0].qty == 25
-        assert o.payment_payload["mode"] == "simulation"
+        assert o.payment_payload["provider"] == "travoy"
         print("   OK order", o.order_number, "items:", len(o.items), "total:", o.total)
 
         # cleanup POC rows

@@ -10,9 +10,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from auth import create_token, get_current_user, normalize_phone, normalize_username
 from database import get_db
-from models import Order, OrderItem, PaymentTransaction, Product, StockMovement, User
+from models import Order, OrderItem, Product, StockMovement, User
 from events import broadcaster
-from payments.midtrans import midtrans
+from routers.payments import apply_charge, build_charge
 from schemas import CheckoutIn, CheckoutOut, CustomerLoginIn, OrderOut, TokenOut, UserOut
 
 router = APIRouter(tags=["customer"])
@@ -101,8 +101,7 @@ async def checkout(body: CheckoutIn, db: AsyncSession = Depends(get_db)):
     order = Order(
         order_number=order_number, user_id=user.id, customer_name=user.full_name, phone=phone, address=body.address,
         notes=body.notes, subtotal=subtotal, shipping_fee=shipping, total=total,
-        payment_method=body.payment_method, payment_channel=body.payment_channel,
-        payment_status={"cod": "cod", "piutang": "piutang"}.get(body.payment_method, "pending"), order_status="baru",
+        payment_method=body.payment_method, payment_channel=None, payment_status="pending", order_status="baru",
     )
     order.items = order_items
     db.add(order)
@@ -111,22 +110,11 @@ async def checkout(body: CheckoutIn, db: AsyncSession = Depends(get_db)):
         db.add(mv)
     await db.flush()
 
-    # create payment instructions right away
     try:
-        charge = await midtrans.create_charge(
-            order_number=order_number, amount=int(total), method=body.payment_method, channel=body.payment_channel,
-            customer_name=user.full_name, phone=phone,
-            items=[{"id": oi.product_id or oi.id, "price": float(oi.price), "qty": oi.qty, "name": oi.product_name} for oi in order_items],
-        )
-    except Exception as exc:  # gateway error -> keep order, mark pending, expose message
-        charge = {"provider": "midtrans", "simulation": False, "reference": None, "payment_status": "pending",
-                  "instructions": {"type": body.payment_method, "error": str(exc)}, "raw": {"error": str(exc)}}
-
-    order.payment_ref = charge.get("reference")
-    order.payment_status = charge.get("payment_status", order.payment_status)
-    order.payment_payload = {"provider": charge["provider"], "simulation": charge["simulation"], "instructions": charge["instructions"]}
-    db.add(PaymentTransaction(order_id=order.id, provider=charge["provider"], method=body.payment_method, channel=body.payment_channel,
-                              status=order.payment_status, amount=total, reference=charge.get("reference"), raw=charge.get("raw")))
+        charge = await build_charge(order)
+    except NotImplementedError as exc:
+        raise HTTPException(501, str(exc))
+    db.add(apply_charge(order, charge))
     await db.commit()
 
     order = (await db.execute(select(Order).where(Order.id == order.id))).scalar_one()
@@ -139,9 +127,8 @@ async def checkout(body: CheckoutIn, db: AsyncSession = Depends(get_db)):
         access_token=create_token(user),
         user=UserOut.model_validate(user),
         payment={
-            "order_number": order_number, "payment_method": body.payment_method, "payment_channel": body.payment_channel,
-            "payment_status": order.payment_status, "amount": float(total), "provider": charge["provider"],
-            "simulation": charge["simulation"], "instructions": charge["instructions"],
+            "order_number": order_number, "payment_method": body.payment_method, "payment_status": order.payment_status,
+            "amount": float(total), "provider": charge["provider"], "instructions": charge["instructions"],
         },
     )
 

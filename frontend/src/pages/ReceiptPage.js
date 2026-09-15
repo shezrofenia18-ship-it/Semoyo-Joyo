@@ -5,7 +5,7 @@ import { api, errorMessage } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { LOGO_FULL, BRAND_NAME, BRAND_TAGLINE } from "@/components/Brand";
-import { rupiah, formatDate, PAYMENT_METHOD_LABEL, PAYMENT_STATUS_LABEL, ORDER_STATUS_LABEL, CHANNEL_LABEL } from "@/lib/format";
+import { rupiah, formatDate, PAYMENT_METHOD_LABEL, PAYMENT_STATUS_LABEL, ORDER_STATUS_LABEL } from "@/lib/format";
 
 /**
  * Struk / Receipt pembelian berlogo Semoyo Joyo.
@@ -41,7 +41,6 @@ export default function ReceiptPage() {
   }
 
   const isPaid = order.payment_status === "paid";
-  const isCod = order.payment_method === "cod";
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
@@ -64,9 +63,9 @@ export default function ReceiptPage() {
             <p className="font-display text-2xl font-bold uppercase tracking-wide text-primary">Struk Pesanan</p>
             <p className="mt-1 font-mono text-sm font-semibold" data-testid="receipt-order-number">{order.order_number}</p>
             <p className="text-xs text-slate-500">{formatDate(order.created_at)}</p>
-            <span className={`mt-2 inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-semibold ${isPaid ? "border-emerald-300 bg-emerald-50 text-emerald-800" : isCod ? "border-sky-300 bg-sky-50 text-sky-800" : "border-amber-300 bg-amber-50 text-amber-800"}`} data-testid="receipt-payment-status">
+            <span className={`mt-2 inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-semibold ${isPaid ? "border-emerald-300 bg-emerald-50 text-emerald-800" : order.payment_status === "piutang" ? "border-violet-300 bg-violet-50 text-violet-800" : "border-amber-300 bg-amber-50 text-amber-800"}`} data-testid="receipt-payment-status">
               {isPaid ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Clock3 className="h-3.5 w-3.5" />}
-              {isPaid ? "LUNAS" : isCod ? "BAYAR DI TEMPAT (COD)" : order.payment_status === "piutang" ? "BELUM BAYAR / PIUTANG" : PAYMENT_STATUS_LABEL[order.payment_status]?.toUpperCase() || order.payment_status}
+              {isPaid ? "LUNAS" : order.payment_status === "piutang" ? "BELUM BAYAR / PIUTANG" : PAYMENT_STATUS_LABEL[order.payment_status]?.toUpperCase() || order.payment_status}
             </span>
           </div>
         </header>
@@ -82,7 +81,7 @@ export default function ReceiptPage() {
           </div>
           <div className="sm:text-right">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Pembayaran</p>
-            <p className="mt-1 font-semibold">{PAYMENT_METHOD_LABEL[order.payment_method] || order.payment_method}{order.payment_channel ? ` - ${CHANNEL_LABEL[order.payment_channel] || order.payment_channel}` : ""}</p>
+            <p className="mt-1 font-semibold">{PAYMENT_METHOD_LABEL[order.payment_method] || order.payment_method}</p>
             {order.payment_ref && <p className="break-all text-xs text-slate-500">Ref: {order.payment_ref}</p>}
             {order.paid_at && <p className="text-xs text-emerald-700">Dibayar {formatDate(order.paid_at)}</p>}
             <p className="mt-1 text-xs text-slate-500">Status pesanan: {ORDER_STATUS_LABEL[order.order_status] || order.order_status}</p>

@@ -7,7 +7,6 @@ const PAYMENT = {
   paid: "bg-emerald-50 text-emerald-800 border-emerald-200",
   failed: "bg-rose-50 text-rose-800 border-rose-200",
   expired: "bg-zinc-50 text-zinc-700 border-zinc-200",
-  cod: "bg-sky-50 text-sky-800 border-sky-200",
   piutang: "bg-violet-50 text-violet-800 border-violet-200",
 };
 const ORDER = {

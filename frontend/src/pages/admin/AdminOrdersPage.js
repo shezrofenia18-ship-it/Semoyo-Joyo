@@ -17,7 +17,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { PaymentStatusBadge, OrderStatusBadge } from "@/components/StatusBadge";
-import { rupiah, formatDate, ORDER_STATUS_LABEL, PAYMENT_STATUS_LABEL, PAYMENT_METHOD_LABEL, CHANNEL_LABEL, SETTLE_METHOD_LABEL } from "@/lib/format";
+import { rupiah, formatDate, ORDER_STATUS_LABEL, PAYMENT_STATUS_LABEL, PAYMENT_METHOD_LABEL, SETTLE_METHOD_LABEL } from "@/lib/format";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 export default function AdminOrdersPage() {
@@ -190,7 +190,7 @@ export default function AdminOrdersPage() {
                       <p className="font-medium">{o.customer_name}</p>
                       <p className="text-xs text-muted-foreground">{o.phone}</p>
                     </TableCell>
-                    <TableCell className="text-sm">{PAYMENT_METHOD_LABEL[o.payment_method]}{o.payment_channel ? ` (${CHANNEL_LABEL[o.payment_channel] || o.payment_channel})` : ""}</TableCell>
+                    <TableCell className="text-sm">{PAYMENT_METHOD_LABEL[o.payment_method] || o.payment_method}</TableCell>
                     <TableCell className="text-right font-medium">{rupiah(o.total)}</TableCell>
                     <TableCell><PaymentStatusBadge status={o.payment_status} /></TableCell>
                     <TableCell><OrderStatusBadge status={o.order_status} /></TableCell>
@@ -284,7 +284,7 @@ export default function AdminOrdersPage() {
 
                 <div className="rounded-xl border bg-card p-4 text-sm">
                   <p className="mb-2 font-semibold">Pembayaran</p>
-                  <p>{PAYMENT_METHOD_LABEL[selected.payment_method]}{selected.payment_channel ? ` - ${CHANNEL_LABEL[selected.payment_channel] || selected.payment_channel}` : ""}</p>
+                  <p>{PAYMENT_METHOD_LABEL[selected.payment_method] || selected.payment_method}</p>
                   {selected.payment_ref && <p className="break-all text-xs text-muted-foreground">Ref: {selected.payment_ref}</p>}
                   {selected.paid_at && <p className="text-xs text-emerald-700">Lunas {formatDate(selected.paid_at)}</p>}
                   {selected.payment_status === "piutang" && (

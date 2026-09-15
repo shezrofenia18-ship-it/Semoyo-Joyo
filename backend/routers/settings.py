@@ -232,7 +232,7 @@ async def sync_data(owner: User = Depends(get_owner_user), db: AsyncSession = De
     """Validasi & hitung ulang angka turunan agar Penjualan, Piutang, Pengeluaran, Keuangan, Laporan, Riwayat konsisten.
 
     Aman dijalankan kapan saja: hanya memperbaiki nilai TURUNAN yang deterministik (subtotal item = harga x qty,
-    subtotal pesanan = jumlah item, total = subtotal + ongkir, paid_at, snapshot HPP, status bayar COD/piutang).
+    subtotal pesanan = jumlah item, total = subtotal + ongkir, paid_at, snapshot HPP, status bayar Cash/piutang).
     Data utama (item, harga, qty, stok, pesanan) TIDAK diubah/dihapus - anomali stok hanya dilaporkan.
     """
     t0 = time.perf_counter()
@@ -280,8 +280,9 @@ async def sync_data(owner: User = Depends(get_owner_user), db: AsyncSession = De
         if o.payment_status != "paid" and o.paid_at:
             o.paid_at = None
             fixed += 1
-        if o.payment_method == "cod" and o.payment_status == "pending":
-            o.payment_status = "cod"
+        if o.payment_method == "cash" and o.payment_status == "pending":
+            o.payment_status = "paid"
+            o.paid_at = o.paid_at or o.created_at
             fixed += 1
         if o.payment_method == "piutang" and o.payment_status == "pending":
             o.payment_status = "piutang"
@@ -320,9 +321,9 @@ async def sync_data(owner: User = Depends(get_owner_user), db: AsyncSession = De
     n_users = (await db.execute(select(func.count(User.id)).where(User.role == "customer"))).scalar() or 0
     add("customers", "Database pelanggan (relasi pesanan)", int(n_users), 0, [f"{orphan} pesanan tanpa akun pelanggan"] if orphan else [])
 
-    # 6) Piutang: status piutang tapi metode bukan piutang/cod -> laporkan; pesanan dibatalkan dengan status piutang -> tidak dihitung
+    # 6) Piutang: status piutang tapi metode bukan piutang -> laporkan; pesanan dibatalkan dengan status piutang -> tidak dihitung
     recv_rows = (await db.execute(select(Order).where(Order.payment_status == "piutang"))).scalars().all()
-    warns = [f"Pesanan {o.order_number} berstatus piutang dengan metode {o.payment_method}" for o in recv_rows if o.payment_method not in ("piutang", "cod", "bank_transfer", "qris", "ewallet")]
+    warns = [f"Pesanan {o.order_number} berstatus piutang dengan metode {o.payment_method}" for o in recv_rows if o.payment_method not in ("piutang", "transfer_va")]
     add("receivables", "Piutang (status & metode)", len(recv_rows), 0, warns)
 
     await db.flush()

@@ -80,7 +80,7 @@ export function useAdminEvents(enabled = true) {
           return u + 1;
         });
         beep();
-        const body = `${data.customer_name} · ${rupiah(data.total)} · ${data.payment_method === "cod" ? "COD" : "Menunggu pembayaran"}`;
+        const body = `${data.customer_name} · ${rupiah(data.total)} · ${{ cash: "Tunai (Lunas)", piutang: "Bayar Nanti (Piutang)", transfer_va: "Transfer VA (menunggu)" }[data.payment_method] || data.payment_method}`;
         toast.success(`Pesanan baru ${data.order_number}`, {
           description: body,
           duration: 12000,

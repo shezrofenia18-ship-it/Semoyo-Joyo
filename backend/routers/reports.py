@@ -1,6 +1,6 @@
 """Laporan Penjualan (khusus Owner): ringkasan periode, detail pesanan, export Excel (.xlsx) & PDF.
 
-Definisi "terjual": pesanan LUNAS (payment_status=paid) ATAU COD yang sudah SELESAI, dan tidak dibatalkan
+Definisi "terjual": pesanan LUNAS (payment_status=paid, termasuk Cash) ATAU piutang yang sudah SELESAI, dan tidak dibatalkan
 (sama dengan perhitungan laba/rugi di Dashboard). Filter tanggal memakai tanggal pesanan (WIB, UTC+7).
 """
 from __future__ import annotations
@@ -31,8 +31,8 @@ BRAND_BLUE = "#0B4EA2"
 BRAND_YELLOW = "#F5C400"
 LOGO_PATH = Path(__file__).resolve().parent.parent / "assets" / "logo.png"
 
-# Definisi "terjual" terpusat di finance.py (SOLD_FILTER): lunas ATAU COD/piutang selesai; tidak dibatalkan
-PAYMENT_LABEL = {"cod": "COD", "bank_transfer": "Transfer Bank", "qris": "QRIS", "ewallet": "E-Wallet", "piutang": "Piutang"}
+# Definisi "terjual" terpusat di finance.py (SOLD_FILTER): lunas ATAU piutang selesai; tidak dibatalkan
+PAYMENT_LABEL = {"cash": "Cash (Tunai)", "piutang": "Bayar Nanti", "transfer_va": "Transfer VA"}
 STATUS_LABEL = {"baru": "Baru", "diproses": "Diproses", "dikirim": "Dikirim", "selesai": "Selesai", "dibatalkan": "Dibatalkan"}
 MONTHS_ID = ["", "Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"]
 
@@ -46,7 +46,6 @@ class ReportRow(BaseModel):
     customer_name: str
     phone: str
     payment_method: str
-    payment_channel: Optional[str] = None
     payment_status: str
     order_status: str
     items_count: int
@@ -163,7 +162,7 @@ async def build_report(db: AsyncSession, s: date, e: date) -> SalesReportOut:
         items_sold += int(qty or 0)
         rows.append(ReportRow(
             order_id=o.id, order_number=o.order_number, created_at=o.created_at, paid_at=o.paid_at, customer_name=o.customer_name, phone=o.phone,
-            payment_method=o.payment_method, payment_channel=o.payment_channel, payment_status=o.payment_status, order_status=o.order_status,
+            payment_method=o.payment_method, payment_status=o.payment_status, order_status=o.order_status,
             items_count=int(qty or 0), subtotal=float(o.subtotal or 0), shipping_fee=float(o.shipping_fee or 0), total=rev, cost=cost_f, profit=profit,
             margin_pct=round(profit / rev * 100, 1) if rev > 0 else 0.0,
         ))
@@ -274,7 +273,7 @@ def render_xlsx(r: SalesReportOut) -> bytes:
     ws["B7"].font = Font(italic=True, color="6B7280")
     ws["B9"], ws["C9"] = "Periode", periode
     ws["B10"], ws["C10"] = "Dibuat pada", generated
-    ws["B11"], ws["C11"] = "Dasar perhitungan", "Pesanan lunas / COD & piutang selesai (tidak dibatalkan), berdasarkan tanggal pesanan; laba bersih = laba kotor - pengeluaran"
+    ws["B11"], ws["C11"] = "Dasar perhitungan", "Pesanan lunas / piutang selesai (tidak dibatalkan), berdasarkan tanggal pesanan; laba bersih = laba kotor - pengeluaran"
     for c in ("B9", "B10", "B11"):
         ws[c].font = Font(bold=True)
 
@@ -320,7 +319,7 @@ def render_xlsx(r: SalesReportOut) -> bytes:
     for i, row in enumerate(r.rows, start=1):
         rr = HR + i
         values = [i, row.order_number, row.created_at.astimezone(WIB).replace(tzinfo=None), row.paid_at.astimezone(WIB).replace(tzinfo=None) if row.paid_at else "-",
-                  row.customer_name, row.phone, PAYMENT_LABEL.get(row.payment_method, row.payment_method) + (f" ({row.payment_channel.upper()})" if row.payment_channel else ""),
+                  row.customer_name, row.phone, PAYMENT_LABEL.get(row.payment_method, row.payment_method),
                   STATUS_LABEL.get(row.order_status, row.order_status), row.items_count, row.subtotal, row.shipping_fee, row.total, row.cost, row.profit, row.margin_pct / 100]
         for col, v in enumerate(values, start=1):
             c = wd.cell(row=rr, column=col, value=v)
@@ -466,7 +465,7 @@ def render_pdf(r: SalesReportOut, owner_name: str) -> bytes:
         ("TOPPADDING", (0, 0), (-1, -1), 6), ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
     ]))
     story += [Paragraph("Ringkasan Periode", sec), kpi_tbl, Spacer(1, 2 * mm),
-              Paragraph(f"Dasar perhitungan: pesanan <b>lunas</b> atau <b>COD / piutang selesai</b> (tidak dibatalkan) berdasarkan tanggal pesanan. "
+              Paragraph(f"Dasar perhitungan: pesanan <b>lunas</b> atau <b>piutang selesai</b> (tidak dibatalkan) berdasarkan tanggal pesanan. "
                         f"Laba bersih = laba kotor - pengeluaran operasional periode ini (margin {sm.margin_pct:.1f}%). "
                         f"Item terjual: {sm.items_sold:,} &nbsp;|&nbsp; Rata-rata nilai pesanan: {rp(sm.avg_order_value)}".replace(",", "."), note),
               Spacer(1, 5 * mm)]
@@ -476,7 +475,7 @@ def render_pdf(r: SalesReportOut, owner_name: str) -> bytes:
     head = ["No", "No. Pesanan", "Tanggal", "Nama Pembeli", "Metode Bayar", "Status", "Item", "Total Penjualan", "Modal (HPP)", "Laba", "Margin"]
     data = [head]
     for i, row in enumerate(r.rows, start=1):
-        method = PAYMENT_LABEL.get(row.payment_method, row.payment_method) + (f" ({row.payment_channel.upper()})" if row.payment_channel else "")
+        method = PAYMENT_LABEL.get(row.payment_method, row.payment_method)
         data.append([str(i), row.order_number, fmt_dt_id(row.created_at), Paragraph(row.customer_name, small), method, STATUS_LABEL.get(row.order_status, row.order_status),
                      str(row.items_count), rp(row.total), rp(row.cost), rp(row.profit), f"{row.margin_pct:.1f}%"])
     if not r.rows:

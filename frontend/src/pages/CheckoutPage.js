@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Truck, Landmark, QrCode, Wallet, Loader2, ShoppingCart, Info, HandCoins } from "lucide-react";
+import { Banknote, Landmark, Loader2, ShoppingCart, Info, HandCoins, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { api, errorMessage } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -14,43 +14,34 @@ import { ProductImage } from "@/components/ProductImage";
 import { EmptyState } from "@/components/EmptyState";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
-import { rupiah, CHANNEL_LABEL } from "@/lib/format";
+import { rupiah } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 const METHODS = [
-  { key: "cod", title: "COD", desc: "Bayar saat barang diterima", icon: Truck, testid: "payment-method-cod" },
-  { key: "bank_transfer", title: "Transfer Bank", desc: "Virtual Account, verifikasi otomatis", icon: Landmark, testid: "payment-method-bank-transfer" },
-  { key: "qris", title: "QRIS", desc: "Scan QR dari e-wallet / m-banking", icon: QrCode, testid: "payment-method-qris" },
-  { key: "ewallet", title: "E-Wallet", desc: "GoPay / OVO / DANA / ShopeePay", icon: Wallet, testid: "payment-method-ewallet" },
-  { key: "piutang", title: "Bayar Nanti (Piutang)", desc: "Pelanggan tetap: ambil barang dulu, bayar belakangan", icon: HandCoins, testid: "payment-method-piutang" },
+  { key: "cash", title: "Cash (Tunai)", desc: "Dibayar langsung, pesanan berstatus Lunas", icon: Banknote, testid: "payment-method-cash" },
+  { key: "piutang", title: "Bayar Nanti", desc: "Ambil barang dulu, tercatat sebagai piutang", icon: HandCoins, testid: "payment-method-piutang" },
+  { key: "transfer_va", title: "Transfer VA", desc: "Virtual Account via Travoy Pay", icon: Landmark, testid: "payment-method-transfer-va", soon: true },
 ];
+
+const SUBMIT_LABEL = { cash: "Buat Pesanan (Tunai)", piutang: "Buat Pesanan (Bayar Nanti)", transfer_va: "Buat Pesanan (Transfer VA)" };
 
 export default function CheckoutPage() {
   const { items, subtotal, clear } = useCart();
   const { user, loginCustomer } = useAuth();
   const navigate = useNavigate();
-  const [config, setConfig] = useState(null);
   const [form, setForm] = useState({ full_name: "", phone: "", address: "", notes: "" });
-  const [method, setMethod] = useState("bank_transfer");
-  const [channel, setChannel] = useState("bca");
+  const [method, setMethod] = useState("cash");
+  const [vaAvailable, setVaAvailable] = useState(false);
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    api.get("/payments/config").then((r) => setConfig(r.data)).catch(() => {});
+    api.get("/payments/config").then((r) => setVaAvailable(!!r.data.methods?.find((m) => m.key === "transfer_va")?.available)).catch(() => {});
   }, []);
 
   useEffect(() => {
     if (user) setForm((f) => ({ ...f, full_name: f.full_name || user.full_name || "", phone: f.phone || user.phone || "", address: f.address || user.address || "" }));
   }, [user]);
-
-  useEffect(() => {
-    if (method === "bank_transfer") setChannel("bca");
-    else if (method === "ewallet") setChannel("gopay");
-    else setChannel(null);
-  }, [method]);
-
-  const channels = config?.methods?.find((m) => m.key === method)?.channels || [];
 
   const validate = () => {
     const e = {};
@@ -73,7 +64,6 @@ export default function CheckoutPage() {
         address: form.address.trim(),
         notes: form.notes.trim() || null,
         payment_method: method,
-        payment_channel: channel,
         items: items.map((i) => ({ product_id: i.product_id, qty: i.qty })),
       };
       const { data } = await api.post("/checkout", payload);
@@ -137,60 +127,58 @@ export default function CheckoutPage() {
           <Card>
             <CardHeader>
               <CardTitle className="font-display text-lg">Metode Pembayaran</CardTitle>
-              <CardDescription>
-                {config?.simulation ? "Mode sandbox/simulasi aktif: pembayaran non-COD dapat disimulasikan." : "Pembayaran terverifikasi otomatis melalui gateway."}
-              </CardDescription>
+              <CardDescription>Pilih salah satu metode pembayaran.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <RadioGroup value={method} onValueChange={setMethod} className="grid gap-3 sm:grid-cols-2">
-                {METHODS.map(({ key, title, desc, icon: I, testid }) => (
-                  <label
-                    key={key}
-                    htmlFor={`pm-${key}`}
-                    data-testid={testid}
-                    className={cn(
-                      "relative flex cursor-pointer items-start gap-3 rounded-xl border bg-card p-4 shadow-sm transition-colors hover:bg-muted/40",
-                      method === key && "border-primary ring-2 ring-ring"
-                    )}
-                  >
-                    <RadioGroupItem id={`pm-${key}`} value={key} className="mt-0.5" />
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent text-accent-foreground">
-                      <I className="h-4 w-4" />
-                    </span>
-                    <span className="min-w-0">
-                      <span className="block text-sm font-semibold">{title}</span>
-                      <span className="block text-xs text-muted-foreground">{desc}</span>
-                    </span>
-                  </label>
-                ))}
+              <RadioGroup value={method} onValueChange={setMethod} className="grid gap-3 sm:grid-cols-3">
+                {METHODS.map(({ key, title, desc, icon: I, testid, soon }) => {
+                  const disabled = soon && !vaAvailable;
+                  return (
+                    <label
+                      key={key}
+                      htmlFor={`pm-${key}`}
+                      data-testid={testid}
+                      aria-disabled={disabled}
+                      className={cn(
+                        "relative flex items-start gap-3 rounded-xl border bg-card p-4 shadow-sm transition-colors",
+                        disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer hover:bg-muted/40",
+                        method === key && "border-primary ring-2 ring-ring"
+                      )}
+                    >
+                      <RadioGroupItem id={`pm-${key}`} value={key} className="mt-0.5" disabled={disabled} />
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent text-accent-foreground">
+                        <I className="h-4 w-4" />
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block text-sm font-semibold">{title}</span>
+                        <span className="block text-xs text-muted-foreground">{desc}</span>
+                        {disabled && (
+                          <span className="mt-1.5 inline-flex items-center gap-1 rounded-md border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800" data-testid="transfer-va-soon-badge">
+                            <Clock className="h-3 w-3" /> Segera hadir
+                          </span>
+                        )}
+                      </span>
+                    </label>
+                  );
+                })}
               </RadioGroup>
 
+              {method === "cash" && (
+                <div className="flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900" data-testid="cash-notice">
+                  <Banknote className="mt-0.5 h-4 w-4 shrink-0" />
+                  <p>Pembayaran diterima tunai di kasir. Pesanan langsung berstatus <b>Lunas</b> dan masuk perhitungan penjualan.</p>
+                </div>
+              )}
               {method === "piutang" && (
                 <div className="flex items-start gap-2 rounded-xl border border-violet-200 bg-violet-50 p-4 text-sm text-violet-900" data-testid="piutang-notice">
                   <HandCoins className="mt-0.5 h-4 w-4 shrink-0" />
-                  <p>Pesanan akan dicatat sebagai <b>piutang (kasbon)</b> atas nama Anda. Barang dikirim/diambil lebih dulu, pembayaran menyusul sesuai kesepakatan dengan admin. Status berubah <b>Lunas</b> setelah admin mengonfirmasi pembayaran.</p>
+                  <p>Pesanan dicatat sebagai <b>piutang (kasbon)</b> dan masuk modul Piutang. Status berubah <b>Lunas</b> setelah admin menandai pembayaran diterima.</p>
                 </div>
               )}
-
-              {channels.length > 0 && (
-                <div className="rounded-xl border bg-muted/40 p-4">
-                  <p className="mb-2 text-sm font-medium">{method === "bank_transfer" ? "Pilih Bank" : "Pilih E-Wallet"}</p>
-                  <div className="flex flex-wrap gap-2" data-testid="payment-channel-options">
-                    {channels.map((c) => (
-                      <button
-                        type="button"
-                        key={c.key}
-                        data-testid={`payment-channel-${c.key}`}
-                        onClick={() => setChannel(c.key)}
-                        className={cn(
-                          "rounded-lg border bg-card px-3 py-2 text-sm font-medium transition-colors",
-                          channel === c.key ? "border-primary bg-accent text-accent-foreground" : "hover:bg-muted"
-                        )}
-                      >
-                        {CHANNEL_LABEL[c.key] || c.name}
-                      </button>
-                    ))}
-                  </div>
+              {method === "transfer_va" && (
+                <div className="flex items-start gap-2 rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-900" data-testid="transfer-va-notice">
+                  <Landmark className="mt-0.5 h-4 w-4 shrink-0" />
+                  <p>Nomor Virtual Account Travoy Pay akan ditampilkan di halaman pembayaran. Pesanan berstatus <b>Menunggu Pembayaran</b> sampai transfer terverifikasi.</p>
                 </div>
               )}
             </CardContent>
@@ -229,7 +217,7 @@ export default function CheckoutPage() {
               </div>
               <Button type="submit" disabled={submitting} className="h-11 w-full gap-2 active:scale-[0.98]" data-testid="checkout-submit-button">
                 {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                {submitting ? "Memproses..." : method === "piutang" ? "Buat Pesanan (Bayar Nanti)" : "Buat Pesanan & Bayar"}
+                {submitting ? "Memproses..." : SUBMIT_LABEL[method]}
               </Button>
               <p className="text-center text-xs text-muted-foreground">Dengan memesan, Anda menyetujui ketentuan pembelian B2B kami.</p>
             </CardContent>

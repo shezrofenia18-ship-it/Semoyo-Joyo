@@ -17,7 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PaymentStatusBadge, OrderStatusBadge } from "@/components/StatusBadge";
-import { rupiah, formatDate, PAYMENT_METHOD_LABEL, CHANNEL_LABEL } from "@/lib/format";
+import { rupiah, formatDate, PAYMENT_METHOD_LABEL } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 /* ---------------- date helpers (tanggal lokal, tanpa timezone shift) ---------------- */
@@ -284,7 +284,7 @@ export default function AdminReportsPage() {
                         <p className="text-xs text-muted-foreground">{r.phone}</p>
                       </TableCell>
                       <TableCell>
-                        <p className="text-sm">{PAYMENT_METHOD_LABEL[r.payment_method] || r.payment_method}{r.payment_channel ? ` · ${CHANNEL_LABEL[r.payment_channel] || r.payment_channel.toUpperCase()}` : ""}</p>
+                        <p className="text-sm">{PAYMENT_METHOD_LABEL[r.payment_method] || r.payment_method}</p>
                         <PaymentStatusBadge status={r.payment_status} />
                       </TableCell>
                       <TableCell className="text-right">{r.items_count}</TableCell>

@@ -8,7 +8,7 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ProductImage } from "@/components/ProductImage";
 import { PaymentStatusBadge, OrderStatusBadge } from "@/components/StatusBadge";
-import { rupiah, formatDate, PAYMENT_METHOD_LABEL, CHANNEL_LABEL, ORDER_STATUS_LABEL } from "@/lib/format";
+import { rupiah, formatDate, PAYMENT_METHOD_LABEL, ORDER_STATUS_LABEL } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 const STEPS = ["baru", "diproses", "dikirim", "selesai"];
@@ -117,7 +117,7 @@ export default function OrderDetailPage() {
           <Card>
             <CardHeader className="pb-3"><CardTitle className="text-base">Pembayaran</CardTitle></CardHeader>
             <CardContent className="space-y-1 text-sm">
-              <p className="font-medium">{PAYMENT_METHOD_LABEL[order.payment_method]}{order.payment_channel ? ` - ${CHANNEL_LABEL[order.payment_channel] || order.payment_channel}` : ""}</p>
+              <p className="font-medium">{PAYMENT_METHOD_LABEL[order.payment_method] || order.payment_method}</p>
               {order.paid_at && <p className="text-muted-foreground">Lunas {formatDate(order.paid_at)}</p>}
               {order.payment_ref && <p className="break-all text-xs text-muted-foreground">Ref: {order.payment_ref}</p>}
             </CardContent>

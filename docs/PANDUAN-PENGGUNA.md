@@ -15,7 +15,7 @@
 2. Beranda & Katalog Produk
 3. Keranjang Belanja
 4. Checkout & Memilih Metode Pembayaran
-5. Halaman Pembayaran (Transfer/VA, QRIS, E-Wallet, COD, Bayar Nanti)
+5. Halaman Pembayaran (Tunai, Bayar Nanti, Transfer VA)
 6. Riwayat Pesanan, Detail Pesanan & Struk
 7. Masuk sebagai Pelanggan
 
@@ -74,7 +74,7 @@ Alamat: `https://<domain-toko>/`
 
 ### Bagian-bagian halaman
 1. **Bilah atas (Navbar)**: logo Semoyo Joyo, kotak **"Cari bahan baku... (beras, ayam, sayur)"**, tombol **Pesanan**, **Masuk**, dan **Keranjang** (biru).
-2. **Hero**: judul "Pasokan bahan baku segar, harga B2B transparan", tombol **Lihat Katalog →** dan **Cek Riwayat Pesanan**, serta 3 keunggulan (Kirim Terjadwal, Auto-verifikasi, Min. Order Jelas).
+2. **Hero**: judul "Pasokan bahan baku segar, harga B2B transparan", tombol **Lihat Katalog →** dan **Cek Riwayat Pesanan**, serta 3 keunggulan (Kirim Terjadwal, Bayar Fleksibel, Min. Order Jelas).
 3. **Chip kategori** (baris bisa digeser): *Beras & Karbohidrat, Protein Hewani, Protein Nabati, Sayuran Segar, Buah-buahan, Minyak Bumbu & Rempah, Susu & Olahan* — angka di chip = jumlah produk.
 4. **Bagian per kategori**: judul kategori, deskripsi, dan grid kartu produk.
 
@@ -136,23 +136,21 @@ Alamat: `/checkout`
 📷 **[Tangkapan layar: Formulir checkout terisi]**
 
 ### Metode pembayaran yang tersedia
-| Metode | Keterangan di layar | Kapan dipakai |
+| Metode | Keterangan di layar | Hasil |
 |---|---|---|
-| **COD** | Bayar saat barang diterima | Pembayaran tunai ke kurir |
-| **Transfer Bank** | Virtual Account, verifikasi otomatis | Transfer ke nomor VA (BCA/BNI/BRI/Mandiri/Permata) |
-| **QRIS** | Scan QR dari e-wallet / m-banking | Bayar scan QR |
-| **E-Wallet** | GoPay / OVO / DANA / ShopeePay | Bayar via aplikasi e-wallet |
-| **Bayar Nanti (Piutang)** | Pelanggan tetap: ambil barang dulu, bayar belakangan | Kasbon — hanya untuk pelanggan tetap sesuai kesepakatan |
+| **Cash (Tunai)** | Dibayar langsung, pesanan berstatus Lunas | Pesanan langsung **Lunas** dan masuk perhitungan penjualan |
+| **Bayar Nanti** | Ambil barang dulu, tercatat sebagai piutang | Pesanan berstatus **Belum Bayar / Piutang** dan otomatis masuk **Modul Piutang** |
+| **Transfer VA** | Virtual Account via Travoy Pay — *Segera hadir* | Belum dapat dipilih; aktif setelah integrasi Travoy Pay selesai |
 
-> Saat memilih **Bayar Nanti**, muncul kotak ungu pemberitahuan bahwa pesanan dicatat sebagai **piutang (kasbon)** dan status akan berubah *Lunas* setelah admin mengonfirmasi pembayaran.
+> Saat memilih metode, kotak pemberitahuan berwarna muncul di bawahnya: hijau (Tunai), ungu (Bayar Nanti), biru (Transfer VA).
 
-📷 **[Tangkapan layar: Pilihan metode pembayaran + kotak pemberitahuan piutang]**
+📷 **[Tangkapan layar: Tiga kartu metode pembayaran + kotak pemberitahuan]**
 
 ### Langkah
 1. Lengkapi formulir data pemesan.
-2. Pilih salah satu **metode pembayaran**.
+2. Pilih **Cash (Tunai)** atau **Bayar Nanti**.
 3. Periksa **ringkasan pesanan** di sisi kanan (item, subtotal, total).
-4. Klik **Buat Pesanan & Bayar** (atau **Buat Pesanan (Bayar Nanti)** untuk piutang).
+4. Klik **Buat Pesanan (Tunai)** atau **Buat Pesanan (Bayar Nanti)**.
 5. Notifikasi *"Pesanan berhasil dibuat"* muncul; nomor pesanan berawalan **SJ-**.
 6. Anda diarahkan ke **Halaman Pembayaran**.
 
@@ -165,27 +163,22 @@ Alamat: `/checkout`
 Alamat: `/pembayaran/SJ-XXXXXXXX`
 
 ### Isi halaman
-- **Nomor pesanan**, total tagihan, status pembayaran, dan metode yang dipilih.
-- **Instruksi pembayaran** sesuai metode:
-  - *Transfer Bank*: nama bank, **nomor Virtual Account** dengan tombol **Salin**, batas waktu.
-  - *QRIS*: gambar kode QR untuk di-scan.
-  - *E-Wallet*: nama kanal dan tombol **Bayar dengan …** (aktif bila gateway terhubung).
-  - *COD*: keterangan bayar saat barang diterima.
-  - *Bayar Nanti*: keterangan piutang, menunggu konfirmasi admin.
-- Tombol **Cek Status** untuk memeriksa apakah pembayaran sudah masuk.
-- Kartu **Ganti metode pembayaran** — untuk berpindah metode sebelum dibayar (notifikasi *"Metode pembayaran diperbarui"*).
-- Tombol **Struk / PDF**, **Belanja Lagi**, **Kembali ke Beranda**.
+- **Nomor pesanan**, tanggal, metode, badge **status pembayaran** & **status pesanan**, tombol **Struk / PDF**.
+- **Banner status** sesuai metode:
+  - *Cash (Tunai)* — hijau: "Pembayaran tunai diterima, pesanan sedang diproses" + waktu lunas.
+  - *Bayar Nanti* — ungu: "Pesanan dicatat sebagai piutang (bayar nanti)"; tagihan masuk modul Piutang.
+  - *Transfer VA* — kuning: "Menunggu pembayaran Transfer VA".
+- Untuk **Transfer VA**: kartu **Transfer Virtual Account · Travoy Pay** berisi total tagihan (tombol **Salin**), kotak bergaris putus-putus *"Integrasi Travoy Pay sedang disiapkan"* (nomor VA akan tampil di sini setelah aktif), tombol **Cek Status**.
+- Kartu **Ganti metode pembayaran** (tampil selama pesanan belum lunas): tombol **Cash (Tunai) · Bayar Nanti · Transfer VA** → notifikasi *"Metode pembayaran diperbarui"*.
+- **Rincian Pesanan**, tombol **Riwayat** dan **Belanja Lagi**.
 
-> **Mode Simulasi:** Bila gateway pembayaran (Midtrans) belum diaktifkan, tampil tombol **Simulasi Bayar (Sandbox)** untuk menandai pembayaran sebagai lunas — dipakai untuk uji coba. Tombol ini hilang otomatis saat gateway aktif.
+📷 **[Tangkapan layar: Halaman pembayaran Tunai (banner hijau Lunas)]**
+📷 **[Tangkapan layar: Halaman pembayaran Transfer VA dengan placeholder Travoy Pay & kartu Ganti metode]**
 
-📷 **[Tangkapan layar: Halaman pembayaran Transfer Bank dengan nomor VA & tombol Salin]**
-📷 **[Tangkapan layar: Kartu "Ganti metode pembayaran"]**
-
-### Langkah membayar (Transfer Bank / VA)
-1. Klik **Salin** pada nomor VA.
-2. Lakukan transfer melalui m-banking/ATM ke nomor VA tersebut sebesar total tagihan.
-3. Kembali ke halaman dan klik **Cek Status** → jika berhasil muncul *"Pembayaran diterima"* dan status berubah **Lunas**.
-4. Klik **Struk / PDF** untuk menyimpan bukti.
+### Langkah (Bayar Nanti)
+1. Simpan nomor pesanan **SJ-** untuk ditagihkan.
+2. Admin akan menandai **Lunas** di modul Piutang setelah pembayaran diterima; status di halaman ini ikut berubah.
+3. Klik **Struk / PDF** untuk menyimpan bukti pesanan.
 
 ---
 
@@ -287,7 +280,7 @@ Alamat: `/admin/dashboard`
 ### Kartu Keuangan · Laba/Rugi 🔒 (Owner)
 **Pendapatan (Omzet) · Total Modal (HPP) · Laba · Margin · Pengeluaran · Nilai Stok (Modal)**
 
-> Definisi "terjual": pesanan **Lunas**, atau **COD/Piutang yang statusnya Selesai**, dan tidak dibatalkan.
+> Definisi "terjual": pesanan **Lunas** (termasuk Tunai), atau **Piutang yang statusnya Selesai**, dan tidak dibatalkan.
 > **Laba Bersih = Omzet − HPP − Pengeluaran.**
 
 ### Panel lain
@@ -320,7 +313,7 @@ Klik baris pesanan → panel geser kanan menampilkan: data pelanggan (nama, tele
 2. Notifikasi *"Status diperbarui"*.
 3. Catatan otomatis:
    - **Dibatalkan** → stok item dikembalikan otomatis.
-   - **Selesai** pada pesanan COD/Piutang → mulai dihitung sebagai penjualan.
+   - **Selesai** pada pesanan Piutang → mulai dihitung sebagai penjualan.
 
 ### 11.3 Mengedit data pesanan
 1. Klik tombol **Edit** di panel detail.
@@ -600,7 +593,7 @@ Alamat: `/admin/pengaturan` — hanya Owner. Terdiri dari 4 tab.
 ### 19.4 Tab **Sinkronisasi Data**
 - Kartu **Angka Tersinkron (sumber tunggal)**: Omzet, Modal (HPP), Laba Kotor, Laba Bersih, Nilai Stok — angka final yang dipakai Dashboard & Laporan.
 - Tombol **Jalankan Sinkronisasi** → dialog *"Jalankan sinkronisasi data?"* → **Ya**.
-- **Hasil Pemeriksaan**: daftar perbaikan otomatis (subtotal item, total pesanan, waktu lunas, snapshot HPP, status COD/piutang) dan **anomali stok** (hanya dilaporkan, tidak diubah).
+- **Hasil Pemeriksaan**: daftar perbaikan otomatis (subtotal item, total pesanan, waktu lunas, snapshot HPP, status Tunai/piutang) dan **anomali stok** (hanya dilaporkan, tidak diubah).
 - Hasil terakhir tersimpan di Audit Log (`sync`).
 
 Jalankan bila angka Dashboard/Laporan terasa tidak konsisten.
@@ -627,10 +620,10 @@ Jalankan bila angka Dashboard/Laporan terasa tidak konsisten.
 ## 21. Istilah & Status
 
 **Status Pesanan:** Baru → Diproses → Dikirim → Selesai · Dibatalkan
-**Status Pembayaran:** Menunggu Pembayaran · Lunas · Gagal · Kedaluwarsa · Piutang
-**Metode Pembayaran:** COD (Bayar di Tempat) · Transfer Bank · QRIS · E-Wallet · Bayar Nanti (Piutang)
+**Status Pembayaran:** Menunggu Pembayaran · Lunas · Gagal · Kedaluwarsa · Belum Bayar / Piutang
+**Metode Pembayaran:** Cash (Tunai) · Bayar Nanti (Piutang) · Transfer VA (Travoy Pay, segera hadir)
 **HPP / Modal:** harga beli × jumlah terjual. **Laba Kotor:** Omzet − HPP. **Laba Bersih:** Laba Kotor − Pengeluaran.
-**Terjual:** pesanan Lunas, atau COD/Piutang yang **Selesai**, dan tidak dibatalkan.
+**Terjual:** pesanan Lunas (termasuk Tunai), atau Piutang yang **Selesai**, dan tidak dibatalkan.
 **Nomor pesanan:** berawalan **SJ-**.
 
 ## 22. Pertanyaan Umum (FAQ)
@@ -645,7 +638,7 @@ Jalankan bila angka Dashboard/Laporan terasa tidak konsisten.
 
 **Produk tidak tampil di beranda?** — Cek switch **Aktif** di Produk dan pastikan kategorinya aktif.
 
-**Tombol "Simulasi Bayar" muncul di halaman pembayaran?** — Gateway Midtrans belum diisi; aplikasi berjalan **mode simulasi**. Isi kunci Midtrans di server untuk pembayaran nyata.
+**Metode Transfer VA tidak bisa dipilih ("Segera hadir")?** — Integrasi **Travoy Pay** masih menunggu dokumen API. Gunakan Tunai atau Bayar Nanti sementara waktu.
 
 **Angka Dashboard terasa tidak sinkron?** — Owner → **Pengaturan → Sinkronisasi Data → Jalankan Sinkronisasi**.
 

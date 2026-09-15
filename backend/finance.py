@@ -3,8 +3,7 @@
 Dipakai oleh Dashboard, Laporan, Piutang, dan Sinkronisasi Data agar semua angka konsisten.
 
 Definisi "terjual" (pendapatan diakui):
-  - payment_status = paid (lunas), ATAU
-  - metode COD dan pesanan selesai, ATAU
+  - payment_status = paid (lunas; pembayaran Cash langsung lunas), ATAU
   - metode Piutang (bayar nanti) dan pesanan selesai (barang sudah diterima pelanggan)
   dan pesanan tidak dibatalkan.
 
@@ -24,7 +23,6 @@ from models import Expense, Order, OrderItem, Product
 
 SOLD_FILTER = (
     (Order.payment_status == "paid")
-    | ((Order.payment_method == "cod") & (Order.order_status == "selesai"))
     | ((Order.payment_method == "piutang") & (Order.order_status == "selesai"))
 ) & (Order.order_status != "dibatalkan")
 

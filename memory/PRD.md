@@ -92,3 +92,11 @@ Brand: Biru #0B4EA2 (primary), Kuning #F5C400 (aksen), Putih. Logo: frontend/pub
   (POST /api/admin/settings/sync: perbaiki nilai turunan deterministik - subtotal item, subtotal/total pesanan, paid_at, snapshot HPP,
   status cod/piutang; anomali stok hanya dilaporkan; snapshot angka final; hasil disimpan di audit log action=sync, GET sync/last).
 - seed.py: akun admin/owner hanya dibuat bila belum ada akun dengan role tsb (kredensial yang diubah Owner tidak di-reset saat restart).
+
+## Tahap 5 (Sep 2026): Penyederhanaan Pembayaran Kasir - SELESAI
+- Midtrans dicabut total (payments/midtrans.py, endpoint simulate/notification, env MIDTRANS_*, CHANNEL_LABEL, qris-placeholder.svg).
+- Metode pembayaran hanya 3: `cash` (langsung paid + paid_at, order_status diproses), `piutang` (payment_status piutang -> modul Piutang),
+  `transfer_va` (kerangka Travoy Pay: backend/payments/travoy.py stub NotImplemented, GET /api/payments/config, POST /api/payments/travoy/notification 503/501,
+  UI checkout kartu "Segera hadir" disabled sampai TRAVOY_API_KEY+TRAVOY_BASE_URL diisi; halaman pembayaran placeholder VA + Ganti metode).
+- SOLD_FILTER: paid ATAU piutang selesai. Migrasi ringan: cod->cash, bank_transfer/qris/ewallet->transfer_va.
+- Dokumen: README-DEPLOY, .env.example, docker-compose, docs/PANDUAN-PENGGUNA (md+pdf) diperbarui. Skrip tes lama (backend_test*.py) dihapus.
