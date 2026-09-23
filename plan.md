@@ -138,4 +138,4 @@
 - [x] Tahap 6 (Sep 2026): Alur pesanan & pembayaran baru - checkout 3 metode (Cash / Bayar Nanti / Bayar Online), Cash status "Proses" +
   tombol Admin/Owner "Selesai / Terima Uang", "Ubah Metode Pembayaran" selama belum lunas, integrasi BATPay SNAP (QRIS & VA, biaya layanan
   gross-up BATPAY_FEE_PERCENT/BATPAY_FEE_FIXED + override per kanal, webhook /api/payments/batpay/webhook -> Lunas & Selesai), tab Owner
-  "Bayar Online" di Pengaturan, seluruh sisa Midtrans/Travoy dihapus. Env BATPAY_* kosong = mode placeholder. Detail di memory/PRD.md.
+  "Bayar Online" di Pengaturan, seluruh sisa gateway lama dihapus. Env BATPAY_* kosong = mode placeholder. Detail di memory/PRD.md.

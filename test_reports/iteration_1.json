@@ -47,7 +47,7 @@
     "Backend: PATCH /api/admin/orders/{id}/status updates order_status and payment_status",
     "Backend: Admin endpoints without token return 401",
     "Backend: Admin endpoints with customer token return 403",
-    "Backend: POST /api/payments/midtrans/notification returns 503 in simulation mode",
+    "Backend: POST /api/payments/gateway lama/notification returns 503 in simulation mode",
     "Frontend: Beranda loads with hero section, 7 category chips, 7 category sections, 39 product cards",
     "Frontend: Product cards show image, price with 'Rp', unit, and min order",
     "Frontend: Search input works - typing 'beras' and pressing Enter navigates to /?q=beras",

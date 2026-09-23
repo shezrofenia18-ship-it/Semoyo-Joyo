@@ -20,8 +20,9 @@ PRIV, PUB = bp.generate_rsa_keypair()
 
 @pytest.fixture()
 def client(monkeypatch):
-    monkeypatch.setenv("BATPAY_CLIENT_KEY", "client-key-123")
-    monkeypatch.setenv("BATPAY_CLIENT_SECRET", "secret-abc")
+    monkeypatch.setenv("BATPAY_CLIENT_ID", "client-key-123")
+    monkeypatch.setenv("BATPAY_PARTNER_ID", "partner-456")
+    monkeypatch.setenv("BATPAY_SECRET_KEY", "secret-abc")
     monkeypatch.setenv("BATPAY_PRIVATE_KEY", PRIV.replace("\n", "\\n"))  # bentuk env satu baris
     monkeypatch.setenv("BATPAY_MERCHANT_ID", "000000000000005")
     monkeypatch.setenv("BATPAY_PUBLIC_KEY", PUB)  # simulasi: BATPay menandatangani dengan kunci pasangan kita
@@ -112,7 +113,7 @@ def test_client_enabled_and_pem_from_escaped_env(client):
 
 
 def test_client_placeholder_when_empty(monkeypatch):
-    for k in ("BATPAY_CLIENT_KEY", "BATPAY_CLIENT_SECRET", "BATPAY_PRIVATE_KEY", "BATPAY_MERCHANT_ID", "BATPAY_WEBHOOK_TOKEN"):
+    for k in ("BATPAY_CLIENT_ID", "BATPAY_PARTNER_ID", "BATPAY_SECRET_KEY", "BATPAY_CLIENT_KEY", "BATPAY_CLIENT_SECRET", "BATPAY_PRIVATE_KEY", "BATPAY_MERCHANT_ID", "BATPAY_WEBHOOK_TOKEN"):
         monkeypatch.delenv(k, raising=False)
     c = bp.BatpayClient()
     assert not c.enabled and c.mode == "batpay_placeholder" and not c.webhook_ready
@@ -125,7 +126,9 @@ def test_outbound_headers_signature(client):
     h = client._headers(bp.PATH_QR_GENERATE, "TOKEN", body)
     expected = bp.hmac_sha512("secret-abc", bp.transaction_string_to_sign("POST", bp.PATH_QR_GENERATE, "TOKEN", body, h["X-TIMESTAMP"]))
     assert h["X-SIGNATURE"] == expected
-    assert h["X-PARTNER-ID"] == "client-key-123" and h["X-EXTERNAL-ID"].isdigit() and h["Authorization"] == "Bearer TOKEN"
+    assert h["X-PARTNER-ID"] == "partner-456" and h["X-EXTERNAL-ID"].isdigit() and h["Authorization"] == "Bearer TOKEN"
+    # Token request memakai Client ID di X-CLIENT-KEY (berbeda dari Partner ID)
+    assert client.client_id == "client-key-123" and client.partner_id == "partner-456"
 
 
 # ---------------- inbound (BATPay -> kita) ----------------

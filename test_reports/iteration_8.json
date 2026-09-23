@@ -1,5 +1,5 @@
 {
-  "summary": "Payment refactor (Midtrans removed → cash / piutang / transfer_va Travoy placeholder) verified end-to-end. Backend pytest 18/18 pass. Playwright verified all 3 method cards, cash & piutang checkout flows, disabled Transfer VA (Segera hadir badge), PaymentPage placeholder + switch-method, admin pages render with new labels, receipt/checkout/homepage free of COD/Midtrans/QRIS/E-Wallet.",
+  "summary": "Payment refactor (gateway lama removed → cash / piutang / transfer_va gateway lama placeholder) verified end-to-end. Backend pytest 18/18 pass. Playwright verified all 3 method cards, cash & piutang checkout flows, disabled Transfer VA (Segera hadir badge), PaymentPage placeholder + switch-method, admin pages render with new labels, receipt/checkout/homepage free of COD/gateway lama/QRIS/E-Wallet.",
   "backend_issues": {"critical": [], "minor": []},
   "frontend_issues": {
     "ui_bugs": [],
@@ -9,7 +9,7 @@
     ]
   },
   "passed_tests": [
-    "GET /api/health -> payment_mode == 'travoy_placeholder'",
+    "GET /api/health -> payment_mode == 'gateway lama_placeholder'",
     "GET /api/payments/config -> cash.available true, piutang.available true, transfer_va.available false",
     "POST /api/checkout cash -> payment_status=paid, paid_at set, order_status=diproses, provider=cash",
     "GET /api/payments/{order_number} works for cash order",
@@ -17,22 +17,22 @@
     "POST /api/checkout piutang -> payment_status=piutang, order_status=baru",
     "Piutang order appears in GET /api/admin/receivables (orders array)",
     "POST /api/admin/orders/{id}/settle {method:'cash'} marks piutang order paid",
-    "POST /api/checkout transfer_va -> payment_status=pending, provider=travoy, instructions.status=awaiting_integration",
+    "POST /api/checkout transfer_va -> payment_status=pending, provider=gateway lama, instructions.status=awaiting_integration",
     "GET /api/payments/{order}/status returns pending for VA",
     "POST /api/payments/{order}/create {payment_method:'cash'} switches VA to paid",
     "POST /api/checkout legacy methods cod/bank_transfer/qris/ewallet -> 422",
-    "POST /api/payments/travoy/notification -> 503",
+    "POST /api/payments/gateway lama/notification -> 503",
     "POST /api/payments/{order}/simulate -> 404",
-    "POST /api/payments/midtrans/notification -> 404",
+    "POST /api/payments/gateway lama/notification -> 404",
     "UI /checkout renders 3 method cards (cash selected by default with cash-notice, piutang with piutang-notice, transfer_va disabled with transfer-va-soon-badge)",
     "UI submit button text switches: 'Buat Pesanan (Tunai)' / 'Buat Pesanan (Bayar Nanti)'",
     "UI Clicking disabled Transfer VA card does not change selection",
     "UI cash checkout -> redirect /pembayaran/SJ-…, green banner 'Pembayaran tunai diterima', badge 'Lunas'",
     "UI piutang checkout -> violet banner 'Pesanan dicatat sebagai piutang (bayar nanti)', badge 'Belum Bayar / Piutang', switch-method-card visible",
-    "UI transfer_va PaymentPage: transfer-va-card + transfer-va-placeholder 'Integrasi Travoy Pay sedang disiapkan', Cek Status button, switch-method-cash & switch-method-piutang visible; switching to piutang updates banner + badge",
-    "Admin /admin/pesanan and /admin/piutang show labels 'Cash (Tunai)', 'Bayar Nanti', 'Transfer VA' (no COD, no Midtrans)",
-    "Customer /struk/{order} receipt renders with no COD/Midtrans text",
-    "Homepage contains 'Bayar Fleksibel' phrase; no Midtrans/QRIS/E-Wallet/COD on customer pages"
+    "UI transfer_va PaymentPage: transfer-va-card + transfer-va-placeholder 'Integrasi gateway lama sedang disiapkan', Cek Status button, switch-method-cash & switch-method-piutang visible; switching to piutang updates banner + badge",
+    "Admin /admin/pesanan and /admin/piutang show labels 'Cash (Tunai)', 'Bayar Nanti', 'Transfer VA' (no COD, no gateway lama)",
+    "Customer /struk/{order} receipt renders with no COD/gateway lama text",
+    "Homepage contains 'Bayar Fleksibel' phrase; no gateway lama/QRIS/E-Wallet/COD on customer pages"
   ],
   "test_report_links": [
     "/app/backend/tests/test_payments_refactor.py",
@@ -52,5 +52,5 @@
   "seed_data_creation": "Created ~5 test orders via API/UI: TEST_ui_cash_buyer, TEST_ui_piutang_buyer, TEST_ui_va_buyer plus 2 pytest-generated orders per method (cash, piutang, transfer_va).",
   "retest_needed": false,
   "should_main_agent_self_test": false,
-  "context_for_next_testing_agent": "Payment refactor complete. /api/admin/receivables returns {total,count,orders:[…]} — not a bare list. Legacy /api/payments/{order}/simulate and /api/payments/midtrans/notification are 404 (routes removed). /api/payments/travoy/notification returns 503 while TRAVOY_* env unset. PaymentMethod schemas.Literal rejects legacy methods with 422 at pydantic layer. UI checkout cart seed key is localStorage 'mbg_cart_v1'."
+  "context_for_next_testing_agent": "Payment refactor complete. /api/admin/receivables returns {total,count,orders:[…]} — not a bare list. Legacy /api/payments/{order}/simulate and /api/payments/gateway lama/notification are 404 (routes removed). /api/payments/gateway lama/notification returns 503 while gateway-lama_* env unset. PaymentMethod schemas.Literal rejects legacy methods with 422 at pydantic layer. UI checkout cart seed key is localStorage 'mbg_cart_v1'."
 }

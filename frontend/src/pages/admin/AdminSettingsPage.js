@@ -344,7 +344,7 @@ function StoreTab() {
 
 /* ============================== Bayar Online (BATPay) ============================== */
 const CRED_LABEL = {
-  client_key: "BATPAY_CLIENT_KEY", client_secret: "BATPAY_CLIENT_SECRET", private_key: "BATPAY_PRIVATE_KEY",
+  partner_id: "BATPAY_PARTNER_ID", client_id: "BATPAY_CLIENT_ID", secret_key: "BATPAY_SECRET_KEY", private_key: "BATPAY_PRIVATE_KEY",
   merchant_id: "BATPAY_MERCHANT_ID", webhook_token: "BATPAY_WEBHOOK_TOKEN (opsional)",
 };
 
@@ -376,12 +376,28 @@ function PaymentGatewayTab() {
   const [cfg, setCfg] = useState(null);
   const [err, setErr] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState(null);
 
   const load = useCallback(() => {
     setLoading(true); setErr(null);
     api.get("/admin/settings/payments").then((r) => setCfg(r.data)).catch((e) => { if (!guard(e)) setErr(errorMessage(e)); }).finally(() => setLoading(false));
   }, [guard]);
   useEffect(() => { load(); }, [load]);
+
+  const testConnection = async () => {
+    setTesting(true); setTestResult(null);
+    try {
+      const { data } = await api.post("/admin/settings/payments/test", {}, { timeout: 45000 });
+      setTestResult(data);
+      if (data.ok) toast.success("Koneksi BATPay berhasil", { description: `${data.message} (${data.latency_ms} ms)` });
+      else toast.error("Uji koneksi gagal", { description: data.message });
+    } catch (e) {
+      if (!guard(e)) toast.error(errorMessage(e));
+    } finally {
+      setTesting(false);
+    }
+  };
 
   if (loading) return <div className="space-y-3" data-testid="batpay-loading"><Skeleton className="h-28 w-full" /><Skeleton className="h-48 w-full" /></div>;
   if (err || !cfg) {
@@ -395,7 +411,9 @@ function PaymentGatewayTab() {
   }
 
   const active = cfg.enabled;
+  const partial = !active && cfg.partial;
   const missing = Object.entries(cfg.configured || {}).filter(([k, v]) => !v && k !== "webhook_token").map(([k]) => CRED_LABEL[k] || k);
+  const envLabel = cfg.env === "production" ? "Production" : (cfg.base_url || "").includes("sg-openapi") ? "Staging" : "Sandbox";
   const qrisChannels = (cfg.channels || []).filter((c) => c.group === "qris");
   const vaChannels = (cfg.channels || []).filter((c) => c.group === "va");
 
@@ -412,13 +430,15 @@ function PaymentGatewayTab() {
               <div className="flex flex-wrap items-center gap-2">
                 <h2 className="text-base font-semibold">BATPay - Bayar Online (QRIS & Virtual Account)</h2>
                 <Badge className={cn("rounded-md", active ? "bg-emerald-600 hover:bg-emerald-600" : "bg-amber-500 hover:bg-amber-500")} data-testid="batpay-mode-badge">
-                  {active ? `Aktif - ${cfg.env === "production" ? "Production" : "Sandbox"}` : "Placeholder (belum aktif)"}
+                  {active ? `Aktif - ${envLabel}` : partial ? "Konfigurasi belum lengkap" : "Placeholder (belum aktif)"}
                 </Badge>
               </div>
               <p className="mt-1 text-sm text-muted-foreground" data-testid="batpay-status-text">
                 {active
-                  ? `Tagihan QRIS/VA dibuat nyata melalui ${cfg.base_url}. Pembayaran yang masuk lewat webhook otomatis mengubah pesanan menjadi Lunas & Selesai.`
-                  : "Kredensial BATPay belum diisi di environment backend. Opsi Bayar Online tampil nonaktif di checkout; pelanggan hanya dapat memakai Cash atau Bayar Nanti."}
+                  ? `Tagihan QRIS/VA dibuat nyata melalui ${cfg.base_url} (Merchant ${cfg.merchant_id}). Pembayaran yang masuk lewat webhook otomatis mengubah pesanan menjadi Lunas & Selesai.`
+                  : partial
+                    ? `Sebagian kredensial BATPay sudah terisi (${cfg.base_url}), tetapi variabel berikut masih kosong. Bayar Online tetap nonaktif di checkout sampai lengkap.`
+                    : "Kredensial BATPay belum diisi di environment backend. Opsi Bayar Online tampil nonaktif di checkout; pelanggan hanya dapat memakai Cash atau Bayar Nanti."}
               </p>
               {!active && missing.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-1.5" data-testid="batpay-missing-list">
@@ -427,8 +447,25 @@ function PaymentGatewayTab() {
               )}
             </div>
           </div>
-          <Button variant="outline" onClick={load} className="gap-2 shrink-0" data-testid="batpay-refresh"><RefreshCw className="h-4 w-4" /> Muat Ulang</Button>
+          <div className="flex shrink-0 flex-wrap gap-2">
+            <Button variant="outline" onClick={load} className="gap-2" data-testid="batpay-refresh"><RefreshCw className="h-4 w-4" /> Muat Ulang</Button>
+            <Button onClick={testConnection} disabled={testing || !active} className="gap-2" title={active ? "Ambil token B2B dari BATPay" : "Lengkapi kredensial dulu"} data-testid="batpay-test-connection">
+              {testing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Globe className="h-4 w-4" />} Uji Koneksi
+            </Button>
+          </div>
         </CardContent>
+        {testResult && (
+          <CardContent className="border-t px-5 pb-4 pt-3" data-testid="batpay-test-result">
+            <div className={cn("flex items-start gap-2 rounded-lg border p-3 text-sm", testResult.ok ? "border-emerald-200 bg-white text-emerald-800" : "border-red-200 bg-white text-red-800")}>
+              {testResult.ok ? <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" /> : <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />}
+              <div className="min-w-0">
+                <p className="font-medium">{testResult.ok ? "Berhasil" : "Gagal"} - {testResult.message}</p>
+                <p className="text-xs opacity-80">Langkah: {testResult.step} · {testResult.base_url}{testResult.latency_ms != null ? ` · ${testResult.latency_ms} ms` : ""}{testResult.code ? ` · kode ${testResult.code}` : ""}</p>
+                {testResult.raw && <pre className="mt-1 max-h-32 overflow-auto rounded bg-muted p-2 font-mono text-[11px] text-foreground">{typeof testResult.raw === "string" ? testResult.raw : JSON.stringify(testResult.raw, null, 1)}</pre>}
+              </div>
+            </div>
+          </CardContent>
+        )}
       </Card>
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -498,7 +535,7 @@ function PaymentGatewayTab() {
           </div>
           <ol className="list-decimal space-y-1 pl-5 text-xs text-muted-foreground">
             <li>Buat pasangan kunci RSA-2048: <code className="rounded bg-muted px-1 font-mono">bash backend/scripts/generate_batpay_keys.sh</code>, unggah <i>public key</i> ke dashboard BATPay.</li>
-            <li>Isi env backend: <code className="rounded bg-muted px-1 font-mono">BATPAY_ENV, BATPAY_CLIENT_KEY, BATPAY_CLIENT_SECRET, BATPAY_PRIVATE_KEY, BATPAY_MERCHANT_ID</code>, lalu restart/redeploy backend.</li>
+            <li>Isi env backend: <code className="rounded bg-muted px-1 font-mono">BATPAY_ENV, BATPAY_BASE_URL, BATPAY_PARTNER_ID, BATPAY_CLIENT_ID, BATPAY_SECRET_KEY, BATPAY_PRIVATE_KEY, BATPAY_MERCHANT_ID</code>, lalu restart/redeploy backend.</li>
             <li>Daftarkan dua URL di atas di dashboard BATPay, kemudian klik <b>Muat Ulang</b> - status harus berubah menjadi <b>Aktif</b>.</li>
           </ol>
         </CardContent>

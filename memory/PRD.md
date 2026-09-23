@@ -108,4 +108,4 @@ Brand: Biru #0B4EA2 (primary), Kuning #F5C400 (aksen), Putih. Logo: frontend/pub
 - Biaya layanan gross-up dibebankan pembeli: BATPAY_FEE_PERCENT (0.7) / BATPAY_FEE_FIXED (0) global, override per kanal BATPAY_QRIS_FEE_* / BATPAY_VA_FEE_*.
   Kolom orders.service_fee (pass-through, tidak masuk pendapatan toko di finance.py).
 - Owner: Pengaturan -> tab "Bayar Online" (GET /api/admin/settings/payments): status aktif/placeholder, fee, kanal, URL webhook/token untuk dashboard BATPay.
-- Sisa referensi Midtrans/Travoy dihapus dari kode, konfigurasi, tes, dan dokumentasi. Tes: backend/tests/test_batpay_core.py, test_payments_refactor.py.
+- Sisa referensi gateway lama dihapus dari kode, konfigurasi, tes, dan dokumentasi. Tes: backend/tests/test_batpay_core.py, test_payments_refactor.py.

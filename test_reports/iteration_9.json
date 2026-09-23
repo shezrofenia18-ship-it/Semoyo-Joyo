@@ -1,5 +1,5 @@
 {
-  "summary": "Payment refactor complete: Midtrans/Travoy removed → BATPay (cash/piutang/online). Backend 100% (33/33 tests pass). Frontend verified: 3 payment methods, BATPay placeholder mode, admin flows, owner settings. All legacy endpoints return 404. Webhook with X-CALLBACK-TOKEN works correctly.",
+  "summary": "Payment refactor complete: gateway lama removed → BATPay (cash/piutang/online). Backend 100% (33/33 tests pass). Frontend verified: 3 payment methods, BATPay placeholder mode, admin flows, owner settings. All legacy endpoints return 404. Webhook with X-CALLBACK-TOKEN works correctly.",
   
   "backend_issues": {
     "critical_bugs": [],
@@ -38,15 +38,15 @@
     "POST /api/payments/batpay/webhook with amount mismatch -> 404, responseCode='4045213'",
     "POST /api/checkout with legacy methods (cod/bank_transfer/qris/ewallet/transfer_va) -> 422",
     "POST /api/payments/{order}/simulate -> 404",
-    "POST /api/payments/midtrans/notification -> 404",
-    "POST /api/payments/travoy/notification -> 404",
+    "POST /api/payments/gateway lama/notification -> 404",
+    "POST /api/payments/gateway lama/notification -> 404",
     "GET /api/admin/settings/payments with OWNER token -> mode='batpay_placeholder', enabled=false, fees.default.percent=0.7, channels present, webhook_url correct",
     "GET /api/admin/settings/payments with ADMIN token -> 403",
     "Frontend: Homepage loads without errors",
     "Frontend: Admin login works (admin/admin123, owner/owner123)",
     "Frontend: Admin orders page shows new payment method labels (Cash (Tunai), Bayar Nanti (Piutang), Bayar Online (BATPay))",
     "Frontend: Admin dashboard displays piutang summary",
-    "Frontend: No COD/Midtrans/Travoy text on customer pages"
+    "Frontend: No COD/gateway lama text on customer pages"
   ],
   
   "test_report_links": [
@@ -72,7 +72,7 @@
   "should_call_test_agent_after_fix": false,
   "should_main_agent_test_itself": false,
   
-  "context_for_next_testing_agent": "Payment refactor complete. BATPay in placeholder mode (credentials empty). Webhook uses X-CALLBACK-TOKEN: dev-webhook-token-semoyo. Admin can change payment method via PATCH /api/admin/orders/{id}/payment-method. Cash orders completed via POST /api/admin/orders/{id}/complete-cash. Service fee 0.7% gross-up for online payments. All legacy payment methods (COD, Midtrans, Travoy) removed and return 422/404.",
+  "context_for_next_testing_agent": "Payment refactor complete. BATPay in placeholder mode (credentials empty). Webhook uses X-CALLBACK-TOKEN: dev-webhook-token-semoyo. Admin can change payment method via PATCH /api/admin/orders/{id}/payment-method. Cash orders completed via POST /api/admin/orders/{id}/complete-cash. Service fee 0.7% gross-up for online payments. All legacy payment methods (COD, gateway lama, gateway lama) removed and return 422/404.",
   
   "detailed_test_results": {
     "backend_api_tests": {
@@ -154,7 +154,7 @@
     },
     "legacy_removal": {
       "methods_rejected": "cod, bank_transfer, qris, ewallet, transfer_va (422)",
-      "endpoints_removed": "/simulate, /midtrans/notification, /travoy/notification (404)"
+      "endpoints_removed": "/simulate, /gateway lama/notification, /gateway lama/notification (404)"
     }
   },
   

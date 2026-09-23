@@ -40,7 +40,8 @@ Admin dapat mengubah metode pembayaran pesanan yang belum lunas lewat **"Ubah Me
 
 ### Mengaktifkan BATPay
 1. Buat pasangan kunci RSA-2048 (PKCS8): `bash backend/scripts/generate_batpay_keys.sh` -> unggah `public_key.pem` ke dashboard BATPay (Upload Public Key).
-2. Isi env backend: `BATPAY_ENV` (`sandbox`/`production`), `BATPAY_CLIENT_KEY`, `BATPAY_CLIENT_SECRET`, `BATPAY_PRIVATE_KEY` (isi PEM satu baris dengan `\n`, path file, atau base64), `BATPAY_MERCHANT_ID`, `BATPAY_CHANNEL_ID`. Redeploy backend.
+2. Isi env backend: `BATPAY_ENV` (`sandbox`/`production`), `BATPAY_BASE_URL` (staging: `https://sg-openapi.batbiz.id`; kosong = otomatis), `BATPAY_PARTNER_ID`, `BATPAY_CLIENT_ID`, `BATPAY_SECRET_KEY`, `BATPAY_PRIVATE_KEY` (isi PEM satu baris dengan `\n`, path file, atau base64), `BATPAY_MERCHANT_ID`, `BATPAY_CHANNEL_ID`. Redeploy backend.
+   Owner dapat menekan **Uji Koneksi** di **Pengaturan -> Bayar Online** untuk memastikan token B2B berhasil diambil dari BATPay.
 3. Daftarkan URL berikut di dashboard BATPay (Owner dapat melihatnya di **Pengaturan -> Bayar Online**):
    - B2B Access Token (BATPay -> partner): `https://APP_URL/api/payments/batpay/access-token/b2b`
    - Webhook / Payment Notification (QRIS `qr-mpm-notify` & VA `transfer-va/payment`): `https://APP_URL/api/payments/batpay/webhook`

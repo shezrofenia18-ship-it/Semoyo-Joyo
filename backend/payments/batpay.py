@@ -12,7 +12,8 @@ Ringkasan protokol SNAP yang diimplementasikan:
      diverifikasi dengan public key BATPay), lalu memanggil URL notifikasi dengan Bearer token + X-SIGNATURE HMAC_SHA512.
 
 Mode:
-  - enabled  : BATPAY_CLIENT_KEY, BATPAY_CLIENT_SECRET, BATPAY_PRIVATE_KEY, BATPAY_MERCHANT_ID terisi -> tagihan dibuat nyata.
+  - enabled  : BATPAY_PARTNER_ID, BATPAY_CLIENT_ID, BATPAY_SECRET_KEY, BATPAY_PRIVATE_KEY, BATPAY_MERCHANT_ID terisi -> tagihan dibuat nyata.
+  - partial  : sebagian terisi (mis. private key belum ada) -> tetap placeholder, UI Owner menampilkan variabel yang kurang.
   - placeholder: kredensial kosong -> pesanan Bayar Online tetap dibuat (pending + biaya layanan), instruksi "menunggu aktivasi".
 
 Biaya layanan (gross-up) agar dana yang cair ke toko utuh:
@@ -226,8 +227,11 @@ class BatpayClient:
         if self.env not in ("sandbox", "production"):
             self.env = "sandbox"
         self.base_url = (_env("BATPAY_BASE_URL") or (PRODUCTION_BASE_URL if self.env == "production" else SANDBOX_BASE_URL)).rstrip("/")
-        self.client_key = _env("BATPAY_CLIENT_KEY")
-        self.client_secret = _env("BATPAY_CLIENT_SECRET")
+        # Kredensial dari dashboard BATPay: Client ID (X-CLIENT-KEY saat minta token), Partner ID (X-PARTNER-ID saat transaksi),
+        # Secret Key (HMAC_SHA512). Nama env lama BATPAY_CLIENT_KEY / BATPAY_CLIENT_SECRET tetap diterima sebagai fallback.
+        self.client_id = _env("BATPAY_CLIENT_ID") or _env("BATPAY_CLIENT_KEY")
+        self.partner_id = _env("BATPAY_PARTNER_ID") or self.client_id
+        self.secret_key = _env("BATPAY_SECRET_KEY") or _env("BATPAY_CLIENT_SECRET")
         self.private_key = _load_pem(_env("BATPAY_PRIVATE_KEY"))
         self.merchant_id = _env("BATPAY_MERCHANT_ID")
         self.channel_id = _env("BATPAY_CHANNEL_ID", "95221")
@@ -250,7 +254,7 @@ class BatpayClient:
     # ---------- konfigurasi ----------
     @property
     def enabled(self) -> bool:
-        return bool(self.client_key and self.client_secret and self.private_key and self.merchant_id)
+        return bool(self.client_id and self.partner_id and self.secret_key and self.private_key and self.merchant_id)
 
     @property
     def mode(self) -> str:
@@ -284,15 +288,35 @@ class BatpayClient:
 
     def public_config(self, app_url: str = "") -> dict[str, Any]:
         base = (app_url or "").rstrip("/")
+        configured = {"partner_id": bool(self.partner_id), "client_id": bool(self.client_id), "secret_key": bool(self.secret_key),
+                      "private_key": bool(self.private_key), "merchant_id": bool(self.merchant_id), "webhook_token": bool(self.webhook_token)}
+        required = {k: v for k, v in configured.items() if k != "webhook_token"}
         return {
             "provider": PROVIDER, "mode": self.mode, "enabled": self.enabled, "env": self.env, "base_url": self.base_url,
+            "partial": (not self.enabled) and any(required.values()), "missing": [k for k, v in required.items() if not v],
+            "merchant_id": self.merchant_id, "partner_id_hint": (self.partner_id[:6] + "..." + self.partner_id[-4:]) if len(self.partner_id) > 12 else bool(self.partner_id),
             "webhook_ready": self.webhook_ready, "webhook_url": f"{base}{WEBHOOK_PATH}", "token_url": f"{base}{INBOUND_TOKEN_PATH}",
             "channels": self.channels(), "expire_minutes": self.expire_minutes,
             "fees": {"default": {"percent": self.fee_percent, "fixed": self.fee_fixed}, "qris": self.fees["qris"], "va": self.fees["va"]},
             "va_banks": [VA_BANKS[b]["name"] for b in self.va_banks],
-            "configured": {"client_key": bool(self.client_key), "client_secret": bool(self.client_secret), "private_key": bool(self.private_key),
-                           "merchant_id": bool(self.merchant_id), "webhook_token": bool(self.webhook_token)},
+            "configured": configured,
         }
+
+    async def test_connection(self) -> dict[str, Any]:
+        """Uji koneksi ke BATPay: ambil token B2B baru. Tidak pernah mengembalikan rahasia."""
+        if not self.enabled:
+            return {"ok": False, "step": "config", "message": "Kredensial belum lengkap", "missing": self.public_config()["missing"]}
+        t0 = time.perf_counter()
+        try:
+            token = await self.get_token(force=True)
+            return {"ok": True, "step": "token", "message": "Token B2B berhasil diambil dari BATPay", "base_url": self.base_url,
+                    "token_preview": f"{token[:6]}...{token[-4:]}" if len(token) > 12 else "***", "latency_ms": int((time.perf_counter() - t0) * 1000)}
+        except BatpayError as e:
+            return {"ok": False, "step": "token", "message": str(e), "code": e.code, "raw": e.raw if isinstance(e.raw, (dict, str)) else None,
+                    "base_url": self.base_url, "latency_ms": int((time.perf_counter() - t0) * 1000)}
+        except httpx.HTTPError as e:
+            return {"ok": False, "step": "network", "message": f"Tidak dapat menghubungi {self.base_url}: {e.__class__.__name__}", "base_url": self.base_url,
+                    "latency_ms": int((time.perf_counter() - t0) * 1000)}
 
     def placeholder_instructions(self, amount: int, channel: str) -> dict[str, Any]:
         ch = next((c for c in self.channels() if c["key"] == channel), None) or {"name": "QRIS"}
@@ -303,16 +327,16 @@ class BatpayClient:
 
     # ---------- signature outbound ----------
     def sign_token_request(self, timestamp: str) -> str:
-        return rsa_sign(self.private_key, token_string_to_sign(self.client_key, timestamp))
+        return rsa_sign(self.private_key, token_string_to_sign(self.client_id, timestamp))
 
     def sign_transaction(self, method: str, path: str, token: str, body: Any, timestamp: str) -> str:
-        return hmac_sha512(self.client_secret, transaction_string_to_sign(method, path, token, body, timestamp))
+        return hmac_sha512(self.secret_key, transaction_string_to_sign(method, path, token, body, timestamp))
 
     def _headers(self, path: str, token: str, body: Any) -> dict[str, str]:
         ts = wib_timestamp()
         return {
             "Content-Type": "application/json", "Accept": "application/json", "Authorization": f"Bearer {token}",
-            "X-PARTNER-ID": self.client_key, "X-EXTERNAL-ID": external_id(), "X-TIMESTAMP": ts, "CHANNEL-ID": self.channel_id,
+            "X-PARTNER-ID": self.partner_id, "X-EXTERNAL-ID": external_id(), "X-TIMESTAMP": ts, "CHANNEL-ID": self.channel_id,
             "X-SIGNATURE": self.sign_transaction("POST", path, token, body, ts),
         }
 
@@ -323,7 +347,7 @@ class BatpayClient:
         if self._token and not force and time.time() < self._token_exp - 30:
             return self._token
         ts = wib_timestamp()
-        headers = {"Content-Type": "application/json", "X-CLIENT-KEY": self.client_key, "X-TIMESTAMP": ts, "X-SIGNATURE": self.sign_token_request(ts),
+        headers = {"Content-Type": "application/json", "X-CLIENT-KEY": self.client_id, "X-TIMESTAMP": ts, "X-SIGNATURE": self.sign_token_request(ts),
                    "CHANNEL-ID": self.channel_id}
         async with httpx.AsyncClient(timeout=30) as c:
             r = await c.post(f"{self.base_url}{PATH_TOKEN}", json={"grantType": "client_credentials"}, headers=headers)
@@ -413,7 +437,7 @@ class BatpayClient:
         client_key, ts, sig = h.get("x-client-key", ""), h.get("x-timestamp", ""), h.get("x-signature", "")
         if not (client_key and ts and sig):
             return False, "Invalid Mandatory Field X-CLIENT-KEY/X-TIMESTAMP/X-SIGNATURE"
-        if self.client_key and client_key != self.client_key:
+        if self.client_id and client_key not in (self.client_id, self.partner_id):
             return False, "Unauthorized. Unknown Client"
         if not rsa_verify(self.public_key, token_string_to_sign(client_key, ts), sig):
             return False, "Unauthorized. Signature"
@@ -442,7 +466,7 @@ class BatpayClient:
         ts, sig = h.get("x-timestamp", ""), h.get("x-signature", "")
         if not (ts and sig):
             return False, "Invalid Mandatory Field X-TIMESTAMP/X-SIGNATURE"
-        expected = hmac_sha512(self.client_secret, transaction_string_to_sign("POST", path, token, raw_body, ts))
+        expected = hmac_sha512(self.secret_key, transaction_string_to_sign("POST", path, token, raw_body, ts))
         if not hmac.compare_digest(expected, sig):
             return False, "Unauthorized. Signature"
         return True, "snap"

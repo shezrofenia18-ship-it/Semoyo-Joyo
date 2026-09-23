@@ -89,6 +89,18 @@ async def payment_gateway_info(_: User = Depends(get_owner_user)):
     return batpay.public_config(app_url())
 
 
+@router.post("/payments/test")
+async def payment_gateway_test(owner: User = Depends(get_owner_user), db: AsyncSession = Depends(get_db)):
+    """Uji koneksi BATPay (ambil token B2B). Hasil dicatat di Audit Log; rahasia tidak pernah dikembalikan."""
+    from payments.batpay import batpay
+
+    result = await batpay.test_connection()
+    log_action(db, owner, "test", "settings", f"Uji koneksi BATPay ({batpay.base_url}): {'BERHASIL' if result['ok'] else 'GAGAL - ' + str(result.get('message'))}",
+               entity_label="Bayar Online", meta={k: v for k, v in result.items() if k != "raw"})
+    await db.commit()
+    return result
+
+
 # =============================== Akun Staf ===============================
 def _check_owner_password(owner: User, pw: str) -> None:
     if not verify_password(pw, owner.password_hash):
