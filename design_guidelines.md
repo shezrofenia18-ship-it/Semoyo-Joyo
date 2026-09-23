@@ -215,10 +215,9 @@
     "payment_method_selection": {
       "component": "RadioGroup + Card clickable",
       "methods": [
-        {"key": "cod", "title": "COD", "desc": "Bayar saat barang diterima", "icon": "Truck", "testid": "payment-method-cod"},
-        {"key": "bank_transfer", "title": "Transfer Bank", "desc": "Virtual Account / verifikasi otomatis (Midtrans/Xendit)", "icon": "Landmark", "testid": "payment-method-bank-transfer"},
-        {"key": "qris", "title": "QRIS", "desc": "Scan QR untuk bayar (sementara: gambar statis)", "icon": "QrCode", "testid": "payment-method-qris"},
-        {"key": "ewallet", "title": "E-Wallet", "desc": "GoPay / OVO / DANA / ShopeePay", "icon": "Wallet", "testid": "payment-method-ewallet"}
+        {"key": "cash", "title": "Cash (Tunai)", "desc": "Bayar tunai ke kasir; status Proses sampai kasir menerima uang", "icon": "Banknote", "testid": "payment-method-cash"},
+        {"key": "piutang", "title": "Bayar Nanti", "desc": "Tercatat sebagai piutang, dilunasi kemudian", "icon": "HandCoins", "testid": "payment-method-piutang"},
+        {"key": "online", "title": "Bayar Online", "desc": "QRIS / Virtual Account via BATPay (+ biaya layanan)", "icon": "QrCode", "testid": "payment-method-online"}
       ],
       "card_classes": {
         "base": "relative flex items-start gap-3 rounded-xl border bg-card p-4 shadow-sm",

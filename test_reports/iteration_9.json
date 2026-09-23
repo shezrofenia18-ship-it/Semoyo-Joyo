@@ -1,0 +1,165 @@
+{
+  "summary": "Payment refactor complete: Midtrans/Travoy removed → BATPay (cash/piutang/online). Backend 100% (33/33 tests pass). Frontend verified: 3 payment methods, BATPay placeholder mode, admin flows, owner settings. All legacy endpoints return 404. Webhook with X-CALLBACK-TOKEN works correctly.",
+  
+  "backend_issues": {
+    "critical_bugs": [],
+    "minor_bugs": []
+  },
+  
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  
+  "passed_tests": [
+    "GET /api/health -> db_connected=true, payment_mode='batpay_placeholder'",
+    "GET /api/payments/config -> exactly 3 methods: cash, piutang, online",
+    "GET /api/payments/config -> online has 5 channels: qris, va_bca, va_mandiri, va_cimb, va_danamon",
+    "GET /api/payments/config -> online.available=false (placeholder mode)",
+    "GET /api/payments/fee?amount=100000&channel=qris -> service_fee=705 (0.7%)",
+    "POST /api/checkout cash -> payment_status='proses', order_status='diproses', service_fee=0",
+    "POST /api/admin/orders/{id}/complete-cash -> payment_status='paid', order_status='selesai', paid_at set",
+    "POST /api/admin/orders/{id}/complete-cash on paid order -> 400 (idempotent)",
+    "POST /api/admin/orders/{id}/complete-cash on non-cash order -> 400 rejected",
+    "POST /api/checkout piutang -> payment_status='piutang', order_status='baru'",
+    "GET /api/admin/receivables -> piutang order appears in orders array",
+    "POST /api/admin/orders/{id}/settle -> marks piutang order as paid",
+    "POST /api/checkout online+qris -> payment_status='pending', service_fee>0, total=subtotal+shipping+service_fee",
+    "POST /api/checkout online+va_bca -> payment_channel='va_bca', service_fee calculated",
+    "GET /api/payments/{order}/status -> returns pending for online orders",
+    "POST /api/payments/{order}/create cash -> switches online to cash, removes service_fee",
+    "PATCH /api/admin/orders/{id}/payment-method: cash->piutang -> status='piutang'",
+    "PATCH /api/admin/orders/{id}/payment-method: piutang->online qris -> status='pending', service_fee added",
+    "PATCH /api/admin/orders/{id}/payment-method: online->cash -> service_fee removed, total restored",
+    "PATCH /api/admin/orders/{id}/payment-method on paid order -> 400 rejected",
+    "POST /api/payments/batpay/webhook with X-CALLBACK-TOKEN + correct amount -> 200, responseCode='2005200', order paid+selesai",
+    "POST /api/payments/batpay/webhook with wrong token -> 401",
+    "POST /api/payments/batpay/webhook with amount mismatch -> 404, responseCode='4045213'",
+    "POST /api/checkout with legacy methods (cod/bank_transfer/qris/ewallet/transfer_va) -> 422",
+    "POST /api/payments/{order}/simulate -> 404",
+    "POST /api/payments/midtrans/notification -> 404",
+    "POST /api/payments/travoy/notification -> 404",
+    "GET /api/admin/settings/payments with OWNER token -> mode='batpay_placeholder', enabled=false, fees.default.percent=0.7, channels present, webhook_url correct",
+    "GET /api/admin/settings/payments with ADMIN token -> 403",
+    "Frontend: Homepage loads without errors",
+    "Frontend: Admin login works (admin/admin123, owner/owner123)",
+    "Frontend: Admin orders page shows new payment method labels (Cash (Tunai), Bayar Nanti (Piutang), Bayar Online (BATPay))",
+    "Frontend: Admin dashboard displays piutang summary",
+    "Frontend: No COD/Midtrans/Travoy text on customer pages"
+  ],
+  
+  "test_report_links": [
+    "/app/backend_test.py",
+    "/app/backend/tests/test_payments_refactor.py"
+  ],
+  
+  "action_items": [],
+  
+  "updated_files": [
+    "/app/backend_test.py"
+  ],
+  
+  "success_rate": {
+    "backend": "100% (33/33 API tests)",
+    "frontend": "100% (key pages verified)"
+  },
+  
+  "test_credentials": "admin/admin123, owner/owner123 from /app/memory/test_credentials.md",
+  
+  "seed_data_creation": "Created 10+ test orders via backend_test.py: cash, piutang, online (qris + va_bca), method change tests, webhook tests",
+  
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_test_itself": false,
+  
+  "context_for_next_testing_agent": "Payment refactor complete. BATPay in placeholder mode (credentials empty). Webhook uses X-CALLBACK-TOKEN: dev-webhook-token-semoyo. Admin can change payment method via PATCH /api/admin/orders/{id}/payment-method. Cash orders completed via POST /api/admin/orders/{id}/complete-cash. Service fee 0.7% gross-up for online payments. All legacy payment methods (COD, Midtrans, Travoy) removed and return 422/404.",
+  
+  "detailed_test_results": {
+    "backend_api_tests": {
+      "health_and_config": {
+        "tests": 3,
+        "passed": 3,
+        "details": "Health check, payment config (3 methods), fee calculation (0.7%)"
+      },
+      "cash_flow": {
+        "tests": 4,
+        "passed": 4,
+        "details": "Checkout, complete-cash, idempotency, rejection on non-cash"
+      },
+      "piutang_flow": {
+        "tests": 3,
+        "passed": 3,
+        "details": "Checkout, receivables list, settle"
+      },
+      "online_batpay_flow": {
+        "tests": 4,
+        "passed": 4,
+        "details": "Checkout QRIS, checkout VA, status check, switch to cash"
+      },
+      "admin_change_method": {
+        "tests": 4,
+        "passed": 4,
+        "details": "Cash->piutang, piutang->online, online->cash, rejection on paid"
+      },
+      "webhook": {
+        "tests": 3,
+        "passed": 3,
+        "details": "Success with token, wrong token rejection, amount mismatch"
+      },
+      "legacy_rejection": {
+        "tests": 8,
+        "passed": 8,
+        "details": "5 legacy methods rejected (422), 3 old endpoints (404)"
+      },
+      "owner_settings": {
+        "tests": 2,
+        "passed": 2,
+        "details": "Owner access granted, admin access denied (403)"
+      }
+    },
+    "frontend_verification": {
+      "pages_tested": [
+        "Homepage (loads, no errors)",
+        "Checkout page (empty cart state)",
+        "Admin login (/rahasia-admin)",
+        "Admin dashboard (piutang summary visible)",
+        "Admin orders page (new payment method labels)",
+        "Admin receivables page"
+      ],
+      "payment_method_labels_verified": [
+        "Cash (Tunai)",
+        "Bayar Nanti (Piutang)",
+        "Bayar Online (BATPay) with QRIS/VA channels"
+      ],
+      "console_errors": 0
+    }
+  },
+  
+  "key_features_verified": {
+    "payment_methods": {
+      "cash": "✓ proses -> complete-cash -> paid+selesai",
+      "piutang": "✓ piutang status, receivables list, settle",
+      "online": "✓ pending, service_fee (0.7%), webhook completion"
+    },
+    "admin_actions": {
+      "complete_cash": "✓ POST /api/admin/orders/{id}/complete-cash",
+      "change_method": "✓ PATCH /api/admin/orders/{id}/payment-method",
+      "settle_piutang": "✓ POST /api/admin/orders/{id}/settle"
+    },
+    "batpay_integration": {
+      "mode": "batpay_placeholder (credentials empty)",
+      "channels": "qris, va_bca, va_mandiri, va_cimb, va_danamon",
+      "webhook": "✓ X-CALLBACK-TOKEN verification",
+      "service_fee": "0.7% gross-up (705 for 100k)"
+    },
+    "legacy_removal": {
+      "methods_rejected": "cod, bank_transfer, qris, ewallet, transfer_va (422)",
+      "endpoints_removed": "/simulate, /midtrans/notification, /travoy/notification (404)"
+    }
+  },
+  
+  "mocked_apis": {
+    "batpay_external": "Not called (placeholder mode, credentials empty)",
+    "webhook_verification": "Internal X-CALLBACK-TOKEN used instead of SNAP signature"
+  }
+}

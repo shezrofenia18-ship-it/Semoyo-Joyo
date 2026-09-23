@@ -15,7 +15,7 @@
 2. Beranda & Katalog Produk
 3. Keranjang Belanja
 4. Checkout & Memilih Metode Pembayaran
-5. Halaman Pembayaran (Tunai, Bayar Nanti, Transfer VA)
+5. Halaman Pembayaran (Tunai, Bayar Nanti, Bayar Online)
 6. Riwayat Pesanan, Detail Pesanan & Struk
 7. Masuk sebagai Pelanggan
 
@@ -31,7 +31,7 @@
 16. Kategori
 17. Laporan Penjualan 🔒
 18. Audit Log 🔒
-19. Pengaturan 🔒 (Akun Staf, Profil Toko, Database Pelanggan, Sinkronisasi Data)
+19. Pengaturan 🔒 (Akun Staf, Profil Toko, Bayar Online, Database Pelanggan, Sinkronisasi Data)
 
 **Bagian D — Lampiran**
 20. Alur Kerja Harian yang Disarankan
@@ -138,19 +138,20 @@ Alamat: `/checkout`
 ### Metode pembayaran yang tersedia
 | Metode | Keterangan di layar | Hasil |
 |---|---|---|
-| **Cash (Tunai)** | Dibayar langsung, pesanan berstatus Lunas | Pesanan langsung **Lunas** dan masuk perhitungan penjualan |
+| **Cash (Tunai)** | Bayar tunai ke kasir saat pesanan diambil/diantar | Pesanan & pembayaran berstatus **Proses**; kasir (Admin/Owner) menekan **Selesai / Terima Uang** → pembayaran **Lunas**, pesanan **Selesai** |
 | **Bayar Nanti** | Ambil barang dulu, tercatat sebagai piutang | Pesanan berstatus **Belum Bayar / Piutang** dan otomatis masuk **Modul Piutang** |
-| **Transfer VA** | Virtual Account via Travoy Pay — *Segera hadir* | Belum dapat dipilih; aktif setelah integrasi Travoy Pay selesai |
+| **Bayar Online** | QRIS atau Virtual Account (BCA/Mandiri/CIMB/Danamon) via **BATPay** | Pembeli memilih kanal dan melihat **Biaya Layanan** sebelum checkout; setelah dibayar, status otomatis **Lunas** & pesanan **Selesai** |
 
-> Saat memilih metode, kotak pemberitahuan berwarna muncul di bawahnya: hijau (Tunai), ungu (Bayar Nanti), biru (Transfer VA).
+> Saat memilih metode, kotak pemberitahuan berwarna muncul di bawahnya: hijau (Tunai), ungu (Bayar Nanti), biru (Bayar Online). Untuk Bayar Online, pilih kanal (QRIS / VA bank) — **Biaya Layanan** kanal tersebut langsung ditambahkan ke total.
+> Biaya layanan dibebankan ke pembeli (gross-up dari MDR) agar nominal bersih yang diterima toko tetap utuh. Bila BATPay belum diaktifkan Owner, opsi Bayar Online tampil nonaktif.
 
 📷 **[Tangkapan layar: Tiga kartu metode pembayaran + kotak pemberitahuan]**
 
 ### Langkah
 1. Lengkapi formulir data pemesan.
-2. Pilih **Cash (Tunai)** atau **Bayar Nanti**.
+2. Pilih metode di dropdown: **Cash (Tunai)**, **Bayar Nanti**, atau **Bayar Online** (lalu pilih kanal QRIS / VA).
 3. Periksa **ringkasan pesanan** di sisi kanan (item, subtotal, total).
-4. Klik **Buat Pesanan (Tunai)** atau **Buat Pesanan (Bayar Nanti)**.
+4. Klik **Buat Pesanan**.
 5. Notifikasi *"Pesanan berhasil dibuat"* muncul; nomor pesanan berawalan **SJ-**.
 6. Anda diarahkan ke **Halaman Pembayaran**.
 
@@ -165,15 +166,15 @@ Alamat: `/pembayaran/SJ-XXXXXXXX`
 ### Isi halaman
 - **Nomor pesanan**, tanggal, metode, badge **status pembayaran** & **status pesanan**, tombol **Struk / PDF**.
 - **Banner status** sesuai metode:
-  - *Cash (Tunai)* — hijau: "Pembayaran tunai diterima, pesanan sedang diproses" + waktu lunas.
+  - *Cash (Tunai)* — kuning "Proses": bayar tunai ke kasir; setelah kasir menekan **Selesai / Terima Uang**, banner berubah hijau **Lunas**.
   - *Bayar Nanti* — ungu: "Pesanan dicatat sebagai piutang (bayar nanti)"; tagihan masuk modul Piutang.
-  - *Transfer VA* — kuning: "Menunggu pembayaran Transfer VA".
-- Untuk **Transfer VA**: kartu **Transfer Virtual Account · Travoy Pay** berisi total tagihan (tombol **Salin**), kotak bergaris putus-putus *"Integrasi Travoy Pay sedang disiapkan"* (nomor VA akan tampil di sini setelah aktif), tombol **Cek Status**.
-- Kartu **Ganti metode pembayaran** (tampil selama pesanan belum lunas): tombol **Cash (Tunai) · Bayar Nanti · Transfer VA** → notifikasi *"Metode pembayaran diperbarui"*.
+  - *Bayar Online* — biru: "Menunggu pembayaran" dengan hitung mundur masa berlaku tagihan.
+- Untuk **Bayar Online**: kartu **QRIS** menampilkan kode QR untuk dipindai dari e-wallet / m-banking; kartu **Virtual Account** menampilkan nomor VA & bank (tombol **Salin**). Rincian total = subtotal + ongkir + **Biaya Layanan**. Tombol **Cek Status** menyegarkan status dari BATPay.
+- Kartu **Ganti metode pembayaran** (tampil selama pesanan belum lunas): tombol **Cash (Tunai) · Bayar Nanti · Bayar Online** → notifikasi *"Metode pembayaran diperbarui"* (biaya layanan dihitung ulang otomatis).
 - **Rincian Pesanan**, tombol **Riwayat** dan **Belanja Lagi**.
 
 📷 **[Tangkapan layar: Halaman pembayaran Tunai (banner hijau Lunas)]**
-📷 **[Tangkapan layar: Halaman pembayaran Transfer VA dengan placeholder Travoy Pay & kartu Ganti metode]**
+📷 **[Tangkapan layar: Halaman pembayaran Bayar Online (QRIS / VA BATPay) & kartu Ganti metode]**
 
 ### Langkah (Bayar Nanti)
 1. Simpan nomor pesanan **SJ-** untuk ditagihkan.
@@ -264,7 +265,7 @@ Klik **Keluar** di bagian bawah menu samping (desktop) atau di menu ☰ (ponsel)
 | Kategori | Kelola kategori | Semua |
 | Laporan | Laporan penjualan + Excel/PDF | 🔒 Owner |
 | Audit Log | Jejak aktivitas staf | 🔒 Owner |
-| Pengaturan | Akun, profil toko, pelanggan, sinkronisasi | 🔒 Owner |
+| Pengaturan | Akun, profil toko, Bayar Online (BATPay), pelanggan, sinkronisasi | 🔒 Owner |
 
 📷 **[Tangkapan layar: Menu samping panel admin (versi Owner)]**
 
@@ -323,12 +324,22 @@ Klik baris pesanan → panel geser kanan menampilkan: data pelanggan (nama, tele
 
 📷 **[Tangkapan layar: Form edit pesanan]**
 
-### 11.4 Menandai pesanan lunas (pembayaran diterima manual)
-1. Di kotak **Pembayaran** klik **Tandai Lunas (pembayaran diterima)** — tampil untuk pesanan yang belum lunas & tidak dibatalkan.
-2. Pilih **Diterima melalui** (Tunai / Transfer Bank / QRIS / E-Wallet / Lainnya), isi catatan (mis. *"Tunai diterima di gudang"*).
+### 11.4 Pesanan Cash: **Selesai / Terima Uang**
+Pesanan **Cash (Tunai)** dibuat dengan status pembayaran & pesanan **Proses**.
+1. Saat uang diterima, klik tombol hijau **Selesai / Terima Uang** (ikon uang di baris pesanan, atau di kotak **Pembayaran** pada panel detail).
+2. Konfirmasi → pembayaran menjadi **Lunas**, pesanan menjadi **Selesai**, tercatat di Audit Log dan masuk perhitungan penjualan.
+
+### 11.5 Menandai pesanan lunas (pembayaran diterima manual)
+1. Untuk pesanan **Bayar Nanti / Bayar Online** yang dibayar manual, di kotak **Pembayaran** klik **Tandai Lunas (pembayaran diterima)** — tampil untuk pesanan yang belum lunas & tidak dibatalkan.
+2. Pilih **Diterima melalui**, isi catatan (mis. *"Transfer diterima di rekening toko"*).
 3. Klik **Tandai Lunas**.
 
-### 11.5 Menghapus pesanan
+### 11.6 Mengubah metode pembayaran
+Selama pesanan **belum lunas**, Admin/Owner dapat mengganti metode: panel detail → **Ubah Metode Pembayaran** → pilih **Cash / Bayar Nanti / Bayar Online** (untuk Bayar Online pilih kanal QRIS/VA), isi catatan → **Simpan**.
+Biaya layanan & total dihitung ulang otomatis; tagihan online sebelumnya dibatalkan. Perubahan tercatat di Audit Log.
+
+### 11.7 Menghapus pesanan
+
 1. Klik ikon **hapus (🗑)** → dialog *"Hapus pesanan …?"*.
 2. Konfirmasi **Hapus**. Stok item dikembalikan otomatis, aksi tercatat di Audit Log.
 
@@ -564,7 +575,7 @@ Gunakan untuk menelusuri siapa mengubah apa dan kapan (mis. siapa menandai piuta
 
 ## 19. Pengaturan 🔒
 
-Alamat: `/admin/pengaturan` — hanya Owner. Terdiri dari 4 tab.
+Alamat: `/admin/pengaturan` — hanya Owner. Terdiri dari 5 tab.
 
 ### 19.1 Tab **Akun Staf**
 - Kartu **Akun Admin & Owner**: tabel **Akun · Username (ID Login) · Role · Aksi**.
@@ -583,14 +594,23 @@ Alamat: `/admin/pengaturan` — hanya Owner. Terdiri dari 4 tab.
 
 📷 **[Tangkapan layar: Tab Profil Toko]**
 
-### 19.3 Tab **Database Pelanggan**
+### 19.3 Tab **Bayar Online** (BATPay)
+- Kartu status: **Aktif (Sandbox/Production)** bila kredensial BATPay terisi, atau **Placeholder (belum aktif)** dengan daftar variabel env yang masih kosong.
+- **Biaya Layanan**: nilai default global (`BATPAY_FEE_PERCENT` / `BATPAY_FEE_FIXED`, bawaan 0,7% + Rp0) dan nilai efektif per kanal QRIS / VA beserta rumus gross-up.
+- **Kanal Pembayaran**: QRIS dan Virtual Account (BCA, Mandiri, CIMB Niaga, Danamon) dengan biaya & statusnya.
+- **URL untuk Dashboard BATPay**: URL *B2B Access Token* dan *Webhook* (tombol **Salin**) yang harus didaftarkan di dashboard BATPay, plus langkah aktivasi.
+- Rahasia API tidak pernah ditampilkan; pengisian hanya lewat environment variable backend (lihat `README-DEPLOY.md`).
+
+📷 **[Tangkapan layar: Tab Bayar Online — status placeholder]**
+
+### 19.4 Tab **Database Pelanggan**
 - Kartu: **Total Pelanggan · Pelanggan Tetap (≥3 pesanan) · Baru Bulan Ini · Rata-rata belanja**.
 - **Daftar Pelanggan**: **Pelanggan · Pesanan · Total Belanja · Piutang · Transaksi Terakhir · Segmen** (*Pelanggan Tetap / Aktif / Baru / Pasif*).
 - Berguna untuk menentukan siapa yang boleh memakai **Bayar Nanti**.
 
 📷 **[Tangkapan layar: Tab Database Pelanggan]**
 
-### 19.4 Tab **Sinkronisasi Data**
+### 19.5 Tab **Sinkronisasi Data**
 - Kartu **Angka Tersinkron (sumber tunggal)**: Omzet, Modal (HPP), Laba Kotor, Laba Bersih, Nilai Stok — angka final yang dipakai Dashboard & Laporan.
 - Tombol **Jalankan Sinkronisasi** → dialog *"Jalankan sinkronisasi data?"* → **Ya**.
 - **Hasil Pemeriksaan**: daftar perbaikan otomatis (subtotal item, total pesanan, waktu lunas, snapshot HPP, status Tunai/piutang) dan **anomali stok** (hanya dilaporkan, tidak diubah).
@@ -620,8 +640,8 @@ Jalankan bila angka Dashboard/Laporan terasa tidak konsisten.
 ## 21. Istilah & Status
 
 **Status Pesanan:** Baru → Diproses → Dikirim → Selesai · Dibatalkan
-**Status Pembayaran:** Menunggu Pembayaran · Lunas · Gagal · Kedaluwarsa · Belum Bayar / Piutang
-**Metode Pembayaran:** Cash (Tunai) · Bayar Nanti (Piutang) · Transfer VA (Travoy Pay, segera hadir)
+**Status Pembayaran:** Proses (Cash, menunggu kasir) · Menunggu Pembayaran · Lunas · Gagal · Kedaluwarsa · Belum Bayar / Piutang
+**Metode Pembayaran:** Cash (Tunai) · Bayar Nanti (Piutang) · Bayar Online (BATPay: QRIS / Virtual Account, + Biaya Layanan)
 **HPP / Modal:** harga beli × jumlah terjual. **Laba Kotor:** Omzet − HPP. **Laba Bersih:** Laba Kotor − Pengeluaran.
 **Terjual:** pesanan Lunas (termasuk Tunai), atau Piutang yang **Selesai**, dan tidak dibatalkan.
 **Nomor pesanan:** berawalan **SJ-**.
@@ -638,7 +658,11 @@ Jalankan bila angka Dashboard/Laporan terasa tidak konsisten.
 
 **Produk tidak tampil di beranda?** — Cek switch **Aktif** di Produk dan pastikan kategorinya aktif.
 
-**Metode Transfer VA tidak bisa dipilih ("Segera hadir")?** — Integrasi **Travoy Pay** masih menunggu dokumen API. Gunakan Tunai atau Bayar Nanti sementara waktu.
+**Metode Bayar Online tidak bisa dipilih (nonaktif)?** — Kredensial **BATPay** belum diisi di environment backend. Owner dapat memeriksa statusnya di **Pengaturan → Bayar Online**; sementara itu gunakan Tunai atau Bayar Nanti.
+
+**Pesanan Cash masih "Proses" padahal sudah dibayar?** — Admin/Owner menekan **Selesai / Terima Uang** pada detail pesanan; pembayaran menjadi **Lunas** dan pesanan **Selesai**.
+
+**Ingin mengganti metode pembayaran pesanan?** — Selama pesanan belum lunas, Admin membuka detail pesanan → **Ubah Metode Pembayaran**.
 
 **Angka Dashboard terasa tidak sinkron?** — Owner → **Pengaturan → Sinkronisasi Data → Jalankan Sinkronisasi**.
 

@@ -1,10 +1,11 @@
-"""Buat contoh pesanan (via API asli) agar Laporan Penjualan punya data untuk diuji.
+"""Buat contoh pesanan (via API asli) agar Dashboard, Piutang & Laporan Penjualan punya data untuk diuji.
 
 Jalankan: cd /app/backend && python scripts/seed_sample_orders.py
-- 6 pesanan transfer -> disimulasikan lunas
-- 2 pesanan COD -> status selesai (dihitung terjual)
-- 1 pesanan COD baru (belum selesai -> TIDAK masuk laporan)
-- 1 pesanan transfer pending (TIDAK masuk laporan)
+- 4 pesanan Cash  -> kasir klik "Selesai / Terima Uang" (lunas, selesai -> dihitung terjual)
+- 1 pesanan Cash  -> masih Proses (belum diterima uangnya -> TIDAK masuk laporan)
+- 2 pesanan Bayar Nanti -> satu dilunasi (Tandai Lunas), satu masih piutang
+- 1 pesanan Bayar Nanti -> status selesai (dihitung terjual walau belum bayar)
+- 2 pesanan Bayar Online (QRIS / VA) -> pending (menunggu webhook BATPay; TIDAK masuk laporan)
 Beberapa pesanan lunas di-backdate (2, 5, 12, 40 hari lalu) langsung di DB agar filter periode teruji.
 """
 import asyncio
@@ -32,6 +33,14 @@ CUSTOMERS = [
     ("Rumah Makan Padang Raya", "081234567005", "Jl. Ahmad Yani 3, Semarang"),
 ]
 
+# (metode, kanal, aksi akhir, hari lalu)
+PLAN = [
+    ("cash", None, "complete", 0), ("cash", None, "complete", 2), ("cash", None, "complete", 5), ("cash", None, "complete", 40),
+    ("cash", None, "proses", 0),
+    ("piutang", None, "settle", 12), ("piutang", None, "piutang", 1), ("piutang", None, "selesai", 3),
+    ("online", "qris", "pending", 0), ("online", "va_bca", "pending", 0),
+]
+
 
 def pick_items(products, n):
     chosen = random.sample(products, n)
@@ -51,24 +60,21 @@ async def main():
         H = {"Authorization": f"Bearer {tok}"}
 
         created = []  # (order_number, days_ago)
-        plan = [("bank_transfer", "bca", "paid", 0), ("bank_transfer", "bni", "paid", 0), ("ewallet", "gopay", "paid", 2), ("bank_transfer", "mandiri", "paid", 5),
-                ("qris", None, "paid", 12), ("bank_transfer", "bri", "paid", 40), ("cod", None, "selesai", 1), ("cod", None, "selesai", 3),
-                ("cod", None, "baru", 0), ("bank_transfer", "bca", "pending", 0)]
-        for i, (method, channel, final, days_ago) in enumerate(plan):
+        for i, (method, channel, final, days_ago) in enumerate(PLAN):
             name, phone, addr = CUSTOMERS[i % len(CUSTOMERS)]
-            body = {"full_name": name, "phone": phone, "address": addr, "payment_method": method, "payment_channel": channel, "items": pick_items(products, random.randint(1, 3)),
-                    "notes": "Contoh pesanan untuk laporan"}
+            body = {"full_name": name, "phone": phone, "address": addr, "payment_method": method, "payment_channel": channel,
+                    "items": pick_items(products, random.randint(1, 3)), "notes": "Contoh pesanan untuk laporan"}
             r = await c.post("/checkout", json=body)
             r.raise_for_status()
-            on = r.json().get("order_number") or r.json().get("order", {}).get("order_number")
-            if method != "cod":
-                await c.post(f"/payments/{on}/create", json={"payment_method": method, "payment_channel": channel})
-            if final == "paid":
-                (await c.post(f"/payments/{on}/simulate")).raise_for_status()
+            on = r.json()["order"]["order_number"]
+            if final == "complete":
+                (await c.post(f"/admin/orders/{on}/complete-cash", headers=H)).raise_for_status()
+            elif final == "settle":
+                (await c.post(f"/admin/orders/{on}/settle", json={"method": "transfer", "note": "Contoh pelunasan piutang"}, headers=H)).raise_for_status()
             elif final == "selesai":
                 (await c.patch(f"/admin/orders/{on}/status", json={"order_status": "selesai"}, headers=H)).raise_for_status()
             created.append((on, days_ago))
-            print(f"[{i+1:02d}] {on} {method:<13} -> {final:<8} ({days_ago} hari lalu)")
+            print(f"[{i+1:02d}] {on} {method:<8} {channel or '-':<8} -> {final:<9} ({days_ago} hari lalu)")
 
         # Backdate langsung di DB (created_at & paid_at) agar filter tanggal teruji
         from sqlalchemy import update
@@ -79,7 +85,8 @@ async def main():
             for on, d in created:
                 if d:
                     ts = datetime.now(timezone.utc) - timedelta(days=d, hours=random.randint(0, 6))
-                    await s.execute(update(Order).where(Order.order_number == on).values(created_at=ts, paid_at=ts + timedelta(minutes=15)))
+                    await s.execute(update(Order).where(Order.order_number == on, Order.paid_at.isnot(None)).values(created_at=ts, paid_at=ts + timedelta(minutes=15)))
+                    await s.execute(update(Order).where(Order.order_number == on, Order.paid_at.is_(None)).values(created_at=ts))
             await s.commit()
         print("Selesai. Total pesanan dibuat:", len(created))
 

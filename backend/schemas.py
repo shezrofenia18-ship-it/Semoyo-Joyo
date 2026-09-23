@@ -4,9 +4,9 @@ from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-PaymentMethod = Literal["cash", "piutang", "transfer_va"]
+PaymentMethod = Literal["cash", "piutang", "online"]
 OrderStatus = Literal["baru", "diproses", "dikirim", "selesai", "dibatalkan"]
-PaymentStatus = Literal["pending", "paid", "failed", "expired", "piutang"]
+PaymentStatus = Literal["proses", "pending", "paid", "failed", "expired", "piutang"]
 
 
 class ORMModel(BaseModel):
@@ -91,6 +91,7 @@ class CheckoutIn(BaseModel):
     address: str = Field(min_length=5)
     notes: Optional[str] = None
     payment_method: PaymentMethod
+    payment_channel: Optional[str] = Field(default=None, max_length=40, description="Kanal Bayar Online: qris | va_bca | va_mandiri | va_cimb | va_danamon")
     items: list[CheckoutItemIn] = Field(min_length=1)
 
     @field_validator("full_name", "address")
@@ -121,8 +122,10 @@ class OrderOut(ORMModel):
     notes: Optional[str] = None
     subtotal: float
     shipping_fee: float
+    service_fee: float = 0
     total: float
     payment_method: str
+    payment_channel: Optional[str] = None
     payment_status: str
     order_status: str
     payment_ref: Optional[str] = None
@@ -143,15 +146,25 @@ class CheckoutOut(BaseModel):
 # ---------- Payments ----------
 class PaymentCreateIn(BaseModel):
     payment_method: Optional[PaymentMethod] = None
+    payment_channel: Optional[str] = Field(default=None, max_length=40)
 
 
 class PaymentInstructionOut(BaseModel):
     order_number: str
     payment_method: str
+    payment_channel: Optional[str] = None
     payment_status: str
     amount: float
-    provider: str  # cash | manual | travoy
+    service_fee: float = 0
+    provider: str  # cash | manual | batpay
     instructions: dict[str, Any]
+
+
+class PaymentMethodChangeIn(BaseModel):
+    """Admin mengubah metode pembayaran pesanan yang belum lunas."""
+    payment_method: PaymentMethod
+    payment_channel: Optional[str] = Field(default=None, max_length=40)
+    note: Optional[str] = None
 
 
 # ---------- Admin ----------

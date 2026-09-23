@@ -7,7 +7,7 @@ Brand: Biru #0B4EA2 (primary), Kuning #F5C400 (aksen), Putih. Logo: frontend/pub
 ## Tahap 1 (SELESAI)
 - Skema: users, categories, products, orders, order_items, payment_transactions
 - Beranda katalog per kategori, search, keranjang, checkout tanpa registrasi (nama + WA)
-- Pembayaran: COD, VA Midtrans (SIMULASI jika key kosong), QRIS placeholder, E-Wallet; webhook Midtrans
+- Pembayaran (versi awal): COD, VA gateway (SIMULASI jika key kosong), QRIS placeholder, E-Wallet; webhook gateway -> sudah diganti (lihat Tahap 6)
 - Riwayat & detail pesanan; login ringan pelanggan
 - Admin: login, dashboard KPI, CRUD kategori & produk (+upload), pesanan + ubah status
 
@@ -23,12 +23,12 @@ Brand: Biru #0B4EA2 (primary), Kuning #F5C400 (aksen), Putih. Logo: frontend/pub
 - GET/POST/PUT /api/admin/products (cost_price), GET /api/admin/stock, POST /api/admin/stock/{id}/adjust, GET /api/admin/stock/movements, PUT/DELETE /api/admin/orders/{id}, GET /api/admin/dashboard (+finance)
 
 ## Konfigurasi
-- backend/.env: DATABASE_URL, AUTO_START_LOCAL_PG, JWT_SECRET, ADMIN_USERNAME/PASSWORD (admin/admin123), MIDTRANS_*
+- backend/.env: DATABASE_URL, AUTO_START_LOCAL_PG, JWT_SECRET, ADMIN_USERNAME/PASSWORD (admin/admin123), BATPAY_*
 - Dev PostgreSQL: bundle /root/pg15 + data /app/pgdata via backend/scripts/ensure_postgres.sh (self-healing saat pod restart)
 
 ## Setup ulang workspace (git clone, Sep 2026)
 - Repo di-import ke /app; PostgreSQL 15 diinstal via apt lalu dibundel ke /root/pg15 oleh ensure_postgres.sh; data baru di /app/pgdata (auto-seed 7 kategori, 38 produk, user admin & owner).
-- backend/.env dibuat ulang (gitignored): DATABASE_URL localhost, AUTO_START_LOCAL_PG=true, admin/admin123, owner/owner123, Midtrans kosong (simulasi).
+- backend/.env dibuat ulang (gitignored): DATABASE_URL localhost, AUTO_START_LOCAL_PG=true, admin/admin123, owner/owner123, BATPAY_* kosong (placeholder).
 - Health OK, frontend compiled, home + /admin tampil normal.
 
 ## Tahap 3a (SELESAI - teruji 100%): Laporan Penjualan (Owner-only)
@@ -48,7 +48,7 @@ Brand: Biru #0B4EA2 (primary), Kuning #F5C400 (aksen), Putih. Logo: frontend/pub
 - Catatan: "Kenot" dipetakan ke Sayuran Segar (asumsi wortel impor/baby carrot) - konfirmasi pemilik.
 
 ## Backlog
-- Pembelian ke supplier (PO), laporan penjualan periode, ongkir, notifikasi WA, invoice PDF, Midtrans production
+- Pembelian ke supplier (PO), laporan penjualan periode, ongkir, notifikasi WA, invoice PDF, BATPay production
 
 ## Perbaikan Build Docker Production (Sep 2026) - SELESAI
 - Penyebab: `backend/requirements.txt` adalah hasil `pip freeze` environment dev (135 paket) yang memuat
@@ -69,7 +69,7 @@ Brand: Biru #0B4EA2 (primary), Kuning #F5C400 (aksen), Putih. Logo: frontend/pub
 ## Impor ulang workspace (Sep 2026, commit a587231 "Update docker-compose.yml") - SELESAI
 - Repo di-clone ke /app (riwayat git dipertahankan, remote GitHub sama). Tidak ada perubahan kode/fitur.
 - PG15 dipasang via apt -> bundle /root/pg15, data baru /app/pgdata (ensure_postgres.sh, AUTO_START_LOCAL_PG=true).
-- backend/.env dibuat ulang: DATABASE_URL localhost, admin/admin123, owner/owner123, Midtrans kosong (SIMULASI).
+- backend/.env dibuat ulang: DATABASE_URL localhost, admin/admin123, owner/owner123, BATPAY_* kosong (placeholder).
 - Seed: 7 kategori, 38 dummy (auto) + seed_real_products.py -> 58 produk asli aktif, 33 dummy nonaktif. seed_sample_orders TIDAK dijalankan.
 - Verifikasi testing agent (iteration_7): 17/17 backend pass; UI home, login, 8 halaman owner, RBAC redirect OK.
 
@@ -93,10 +93,19 @@ Brand: Biru #0B4EA2 (primary), Kuning #F5C400 (aksen), Putih. Logo: frontend/pub
   status cod/piutang; anomali stok hanya dilaporkan; snapshot angka final; hasil disimpan di audit log action=sync, GET sync/last).
 - seed.py: akun admin/owner hanya dibuat bila belum ada akun dengan role tsb (kredensial yang diubah Owner tidak di-reset saat restart).
 
-## Tahap 5 (Sep 2026): Penyederhanaan Pembayaran Kasir - SELESAI
-- Midtrans dicabut total (payments/midtrans.py, endpoint simulate/notification, env MIDTRANS_*, CHANNEL_LABEL, qris-placeholder.svg).
-- Metode pembayaran hanya 3: `cash` (langsung paid + paid_at, order_status diproses), `piutang` (payment_status piutang -> modul Piutang),
-  `transfer_va` (kerangka Travoy Pay: backend/payments/travoy.py stub NotImplemented, GET /api/payments/config, POST /api/payments/travoy/notification 503/501,
-  UI checkout kartu "Segera hadir" disabled sampai TRAVOY_API_KEY+TRAVOY_BASE_URL diisi; halaman pembayaran placeholder VA + Ganti metode).
-- SOLD_FILTER: paid ATAU piutang selesai. Migrasi ringan: cod->cash, bank_transfer/qris/ewallet->transfer_va.
+## Tahap 5 (Sep 2026): Penyederhanaan Pembayaran Kasir - SELESAI (digantikan Tahap 6)
+- Gateway pembayaran lama dicabut total (modul payments lama, endpoint simulate/notification, env gateway lama, CHANNEL_LABEL, qris-placeholder.svg).
+- Metode dikurangi menjadi 3 (cash / piutang / transfer_va kerangka placeholder). SOLD_FILTER: paid ATAU piutang selesai.
 - Dokumen: README-DEPLOY, .env.example, docker-compose, docs/PANDUAN-PENGGUNA (md+pdf) diperbarui. Skrip tes lama (backend_test*.py) dihapus.
+
+## Tahap 6 (Sep 2026): Alur Pesanan & Pembayaran Baru + Integrasi BATPay - SELESAI
+- Checkout dropdown tepat 3 metode: `cash` (Cash/Tunai), `piutang` (Bayar Nanti), `online` (Bayar Online via BATPay: QRIS & VA BCA/Mandiri/CIMB/Danamon).
+- Cash: order_status "diproses" + payment_status "proses"; Admin/Owner klik "Selesai / Terima Uang" (POST /api/admin/orders/{id}/complete-cash) -> paid + selesai.
+- Admin dapat "Ubah Metode Pembayaran" selama belum lunas (PUT /api/admin/orders/{id}/payment-method): service_fee & total dihitung ulang, tagihan online lama dibatalkan.
+- BATPay SNAP (backend/payments/batpay.py): token B2B (RSA SHA256), signature transaksi HMAC_SHA512, QRIS generate/query/cancel, VA create/status/delete,
+  inbound token POST /api/payments/batpay/access-token/b2b, webhook POST /api/payments/batpay/webhook (verifikasi Bearer JWT + X-SIGNATURE, atau X-CALLBACK-TOKEN internal).
+  Webhook paid -> payment_status paid, order_status selesai. Kredensial kosong = mode placeholder (aman, tanpa call eksternal).
+- Biaya layanan gross-up dibebankan pembeli: BATPAY_FEE_PERCENT (0.7) / BATPAY_FEE_FIXED (0) global, override per kanal BATPAY_QRIS_FEE_* / BATPAY_VA_FEE_*.
+  Kolom orders.service_fee (pass-through, tidak masuk pendapatan toko di finance.py).
+- Owner: Pengaturan -> tab "Bayar Online" (GET /api/admin/settings/payments): status aktif/placeholder, fee, kanal, URL webhook/token untuk dashboard BATPay.
+- Sisa referensi Midtrans/Travoy dihapus dari kode, konfigurasi, tes, dan dokumentasi. Tes: backend/tests/test_batpay_core.py, test_payments_refactor.py.

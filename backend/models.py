@@ -113,10 +113,11 @@ class Order(Base):
     notes: Mapped[str | None] = mapped_column(Text)
     subtotal: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False, default=0)
     shipping_fee: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False, default=0)
-    total: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False, default=0)
-    payment_method: Mapped[str] = mapped_column(String(30), nullable=False)  # cash | piutang | transfer_va
-    payment_channel: Mapped[str | None] = mapped_column(String(40))  # legacy, tidak dipakai
-    payment_status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")  # pending|paid|failed|expired|piutang
+    service_fee: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False, default=0, server_default="0")  # biaya layanan Bayar Online (BATPay), pass-through
+    total: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False, default=0)  # subtotal + ongkir + biaya layanan
+    payment_method: Mapped[str] = mapped_column(String(30), nullable=False)  # cash | piutang | online
+    payment_channel: Mapped[str | None] = mapped_column(String(40))  # online: qris | va_bca | va_mandiri | va_cimb | va_danamon
+    payment_status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")  # proses|pending|paid|failed|expired|piutang
     order_status: Mapped[str] = mapped_column(String(20), nullable=False, default="baru")  # baru|diproses|dikirim|selesai|dibatalkan
     payment_ref: Mapped[str | None] = mapped_column(String(120))
     payment_payload: Mapped[dict | None] = mapped_column(JSONB)
@@ -169,7 +170,7 @@ class PaymentTransaction(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=gen_uuid)
     order_id: Mapped[str] = mapped_column(String(36), ForeignKey("orders.id", ondelete="CASCADE"), index=True, nullable=False)
-    provider: Mapped[str] = mapped_column(String(30), nullable=False)  # cash | manual | travoy
+    provider: Mapped[str] = mapped_column(String(30), nullable=False)  # cash | manual | batpay
     method: Mapped[str] = mapped_column(String(30), nullable=False)
     channel: Mapped[str | None] = mapped_column(String(40))
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")

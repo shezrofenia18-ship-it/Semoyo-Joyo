@@ -3,7 +3,7 @@
 ## 1) Objectives
 - Membangun kerangka fullstack **FastAPI + React + Tailwind + PostgreSQL** yang siap deploy di **Coolify**.
 - Menyediakan alur customer end-to-end: **Beranda (produk per kategori) → Keranjang → Checkout → Pembayaran → Riwayat Pesanan**.
-- Menyediakan **struktur integrasi pembayaran** (Midtrans Snap) dalam mode **sandbox/simulasi**, lengkap dengan endpoint status + webhook.
+- Menyediakan **struktur integrasi pembayaran online** (kini: BATPay SNAP - QRIS & VA) dengan mode placeholder saat kredensial kosong, lengkap dengan endpoint status + webhook.
 - Menyediakan **seed data** kategori & produk + **Admin CRUD** sederhana.
 
 ---
@@ -53,7 +53,7 @@
    - Katalog: `GET /api/categories`, `GET /api/products`, `GET /api/products/{id}`, `GET /api/home`
    - Auth customer ringan: `POST /api/auth/customer/login`, `GET /api/auth/me` (JWT)
    - Orders: `GET /api/orders/me`, `GET /api/orders/{order_number}`
-   - Payments: `create/status/simulate` + webhook `POST /api/payments/midtrans/notification` (signature verify)
+   - Payments: `create/status` + webhook `POST /api/payments/batpay/webhook` (signature verify)
    - Admin: `POST /api/admin/login` + CRUD `admin/categories`, `admin/products`, list orders + update status
 3. Pastikan normalisasi username dari Nama Lengkap (lowercase, trim, replace spaces) dan unique.
 4. Seed data lengkap kategori & produk (Unsplash URLs) + endpoint seed (opsional) / auto-seed saat start bila kosong.
@@ -118,19 +118,24 @@
 ## STATUS (diperbarui setelah Phase 2)
 - [x] Phase 1 POC SELESAI: PostgreSQL 15 lokal (data /app/pgdata), SQLAlchemy async + asyncpg, test_core.py lulus, scripts/ensure_postgres.sh self-healing (auto start saat backend boot).
 - [x] Phase 2 SELESAI & TERUJI (testing agent 100% backend+frontend):
-  - Backend: catalog, checkout (nama->username login ID), customer login Nama+Telp, orders, payments (Midtrans Core API struktur + SIMULASI saat key kosong, webhook SHA512, status polling), admin (login, dashboard, CRUD kategori/produk, upload gambar, orders + status).
+  - Backend: catalog, checkout (nama->username login ID), customer login Nama+Telp, orders, payments (gateway online struktur + placeholder saat key kosong, webhook, status polling - kini BATPay, lihat Tahap 6), admin (login, dashboard, CRUD kategori/produk, upload gambar, orders + status).
   - Frontend: Beranda (grouped by kategori, search, chips), Keranjang (sheet + halaman), Checkout, Pembayaran (COD/Transfer VA/QRIS placeholder/E-Wallet + Simulasi Bayar + ganti metode), Riwayat & Detail Pesanan, Masuk, Admin (dashboard/produk/kategori/pesanan).
   - Deploy: backend/Dockerfile, frontend/Dockerfile + nginx.conf, docker-compose.yml, .env.example, README-DEPLOY.md.
 - Kredensial dev: admin/admin123 (backend/.env). Mode pembayaran: simulation.
-- [ ] Phase 3 (berikutnya, sesuai permintaan user): ERP mini lanjutan (stok masuk/keluar, pembelian ke supplier, laporan), ongkir, notifikasi WA, aktivasi Midtrans dengan key asli, invoice PDF.
+- [ ] Phase 3 (berikutnya, sesuai permintaan user): ERP mini lanjutan (stok masuk/keluar, pembelian ke supplier, laporan), ongkir, notifikasi WA, aktivasi gateway online dengan key asli (BATPay), invoice PDF.
 
 - [x] BUGFIX (pod restart): binary PostgreSQL dibundel di /root/pg15 (persisten), ensure_postgres.sh pakai bundle tanpa apt, lifespan retry DB init. Verified via testing agent (iteration_2, 100%).
 - [x] WORKSPACE BARU (git clone): PG15 diinstal ulang + bundle /root/pg15, backend/.env dibuat ulang, seed otomatis 7 kategori/38 produk.
 - [x] Phase 3a SELESAI: Laporan Penjualan (Owner-only) /admin/laporan — filter periode, ringkasan (omzet/HPP/laba/pesanan lunas), tabel sortable, export Excel (.xlsx) & PDF berkop logo. routers/reports.py. Testing agent iteration_4: backend 100%, frontend lulus.
-- [ ] Phase 3 sisa: PO ke supplier, ongkir, notifikasi WA, invoice PDF per pesanan, aktivasi Midtrans key asli.
+- [ ] Phase 3 sisa: PO ke supplier, ongkir, notifikasi WA, invoice PDF per pesanan, aktivasi BATPay dengan kredensial asli.
 
 - [x] BUGFIX DEPLOY (Sep 2026): requirements.txt dibersihkan (16 pustaka runtime, pinned, tanpa URL internal), Dockerfile backend dirapikan, .dockerignore + .env.example ditambahkan. Verified: install di venv kosong Python 3.11 sukses, backend + frontend berjalan normal di workspace.
 
 - [x] Tahap 4 (Sep 2026): checkout label "Nama / Nama usaha", akses admin stealth (/rahasia-admin + ikon gembok footer), Piutang (bayar nanti + Tandai Lunas),
   modul Pengeluaran (+ biaya angkut saat stok masuk), RBAC owner (OwnerRoute + get_owner_user), Pengaturan owner (akun staf, profil toko,
   database pelanggan, sinkronisasi data), finance.py sumber tunggal. Lihat memory/PRD.md.
+
+- [x] Tahap 6 (Sep 2026): Alur pesanan & pembayaran baru - checkout 3 metode (Cash / Bayar Nanti / Bayar Online), Cash status "Proses" +
+  tombol Admin/Owner "Selesai / Terima Uang", "Ubah Metode Pembayaran" selama belum lunas, integrasi BATPay SNAP (QRIS & VA, biaya layanan
+  gross-up BATPAY_FEE_PERCENT/BATPAY_FEE_FIXED + override per kanal, webhook /api/payments/batpay/webhook -> Lunas & Selesai), tab Owner
+  "Bayar Online" di Pengaturan, seluruh sisa Midtrans/Travoy dihapus. Env BATPAY_* kosong = mode placeholder. Detail di memory/PRD.md.

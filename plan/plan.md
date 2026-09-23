@@ -9,14 +9,14 @@ Mengimpor repo `shezrofenia18-ship-it/Semoyo-Joyo` (branch `main`, commit terbar
 3. Membuat ulang `backend/.env` (file ini tidak ikut di repo karena gitignored) dengan nilai:
    - Koneksi database lokal, `AUTO_START_LOCAL_PG=true`
    - Akun staf: **admin / admin123** dan **owner / owner123**
-   - Midtrans dikosongkan → pembayaran berjalan **MODE SIMULASI**
+   - Kredensial gateway pembayaran online dikosongkan → Bayar Online berjalan **MODE PLACEHOLDER**
 4. Menginstal dependensi backend (Python) dan frontend (yarn), lalu menjalankan ulang layanan.
 5. Menjalankan seed: 7 kategori, akun admin & owner, dan **58 produk asli** (`seed_real_products.py`), sehingga katalog langsung terisi seperti kondisi terakhir.
 6. Verifikasi: beranda katalog, checkout, login `/rahasia-admin`, dashboard, stok, piutang, pengeluaran, laporan owner.
 
 ## Yang TIDAK Dilakukan
 - Tidak ada perubahan kode, fitur, atau desain — murni impor dan menjalankan.
-- Tidak mengisi kunci Midtrans production.
+- Tidak mengisi kunci gateway pembayaran production.
 - Data pesanan/transaksi lama dari deployment sebelumnya **tidak** ikut (repo hanya berisi kode; database dibuat baru).
 
 ## Asumsi (bisa dikoreksi)

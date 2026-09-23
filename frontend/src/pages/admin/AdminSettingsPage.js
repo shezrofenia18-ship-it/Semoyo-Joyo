@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   Settings, UserCog, Store, Users, RefreshCw, ShieldCheck, KeyRound, Loader2, Save, Plus, Trash2, Search, CheckCircle2, AlertTriangle, Info,
-  Pencil, Wallet, HandCoins, Coins, TrendingUp, ReceiptText, Boxes, ShoppingBag, Sparkles,
+  Pencil, Wallet, HandCoins, Coins, TrendingUp, ReceiptText, Boxes, ShoppingBag, Sparkles, QrCode, Landmark, Copy, Globe, Webhook, Link2, Percent,
 } from "lucide-react";
 import { toast } from "sonner";
 import { api, errorMessage } from "@/lib/api";
@@ -27,6 +27,7 @@ import { cn } from "@/lib/utils";
 const TABS = [
   { key: "akun", label: "Akun Staf", icon: UserCog },
   { key: "toko", label: "Profil Toko", icon: Store },
+  { key: "pembayaran", label: "Bayar Online", icon: QrCode },
   { key: "pelanggan", label: "Database Pelanggan", icon: Users },
   { key: "sinkronisasi", label: "Sinkronisasi Data", icon: RefreshCw },
 ];
@@ -52,6 +53,7 @@ export default function AdminSettingsPage() {
         </TabsList>
         <TabsContent value="akun" className="mt-5"><StaffTab /></TabsContent>
         <TabsContent value="toko" className="mt-5"><StoreTab /></TabsContent>
+        <TabsContent value="pembayaran" className="mt-5"><PaymentGatewayTab /></TabsContent>
         <TabsContent value="pelanggan" className="mt-5"><CustomersTab /></TabsContent>
         <TabsContent value="sinkronisasi" className="mt-5"><SyncTab /></TabsContent>
       </Tabs>
@@ -337,6 +339,171 @@ function StoreTab() {
         <Button type="submit" disabled={saving} className="gap-2" data-testid="store-save">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Simpan Profil Toko</Button>
       </div>
     </form>
+  );
+}
+
+/* ============================== Bayar Online (BATPay) ============================== */
+const CRED_LABEL = {
+  client_key: "BATPAY_CLIENT_KEY", client_secret: "BATPAY_CLIENT_SECRET", private_key: "BATPAY_PRIVATE_KEY",
+  merchant_id: "BATPAY_MERCHANT_ID", webhook_token: "BATPAY_WEBHOOK_TOKEN (opsional)",
+};
+
+const fmtFee = (f) => {
+  if (!f) return "-";
+  const parts = [];
+  if (Number(f.percent) > 0) parts.push(`${Number(f.percent).toLocaleString("id-ID", { maximumFractionDigits: 3 })}%`);
+  if (Number(f.fixed) > 0) parts.push(rupiah(f.fixed));
+  return parts.length ? parts.join(" + ") : "Gratis";
+};
+
+function CopyField({ label, value, testId, icon: I }) {
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(value); toast.success("Disalin", { description: label }); } catch { toast.error("Gagal menyalin"); }
+  };
+  return (
+    <div className="space-y-1.5">
+      <Label className="flex items-center gap-1.5 text-xs text-muted-foreground">{I && <I className="h-3.5 w-3.5" />} {label}</Label>
+      <div className="flex gap-2">
+        <Input readOnly value={value} className="bg-muted/40 font-mono text-xs" data-testid={testId} />
+        <Button type="button" variant="outline" size="icon" onClick={copy} aria-label={`Salin ${label}`} data-testid={`${testId}-copy`}><Copy className="h-4 w-4" /></Button>
+      </div>
+    </div>
+  );
+}
+
+function PaymentGatewayTab() {
+  const guard = useAdminGuard();
+  const [cfg, setCfg] = useState(null);
+  const [err, setErr] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(() => {
+    setLoading(true); setErr(null);
+    api.get("/admin/settings/payments").then((r) => setCfg(r.data)).catch((e) => { if (!guard(e)) setErr(errorMessage(e)); }).finally(() => setLoading(false));
+  }, [guard]);
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) return <div className="space-y-3" data-testid="batpay-loading"><Skeleton className="h-28 w-full" /><Skeleton className="h-48 w-full" /></div>;
+  if (err || !cfg) {
+    return (
+      <Card><CardContent className="flex flex-col items-center gap-3 p-10 text-center" data-testid="batpay-error">
+        <AlertTriangle className="h-8 w-8 text-amber-600" />
+        <p className="text-sm text-muted-foreground">{err || "Konfigurasi Bayar Online tidak dapat dimuat."}</p>
+        <Button variant="outline" onClick={load} className="gap-2" data-testid="batpay-retry"><RefreshCw className="h-4 w-4" /> Coba lagi</Button>
+      </CardContent></Card>
+    );
+  }
+
+  const active = cfg.enabled;
+  const missing = Object.entries(cfg.configured || {}).filter(([k, v]) => !v && k !== "webhook_token").map(([k]) => CRED_LABEL[k] || k);
+  const qrisChannels = (cfg.channels || []).filter((c) => c.group === "qris");
+  const vaChannels = (cfg.channels || []).filter((c) => c.group === "va");
+
+  return (
+    <div className="space-y-4" data-testid="batpay-tab">
+      {/* Status */}
+      <Card className={cn("border", active ? "border-emerald-200 bg-emerald-50/60" : "border-amber-200 bg-amber-50/60")} data-testid="batpay-status-card">
+        <CardContent className="flex flex-col gap-4 p-5 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-start gap-3">
+            <div className={cn("grid h-11 w-11 shrink-0 place-items-center rounded-xl", active ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700")}>
+              {active ? <CheckCircle2 className="h-6 w-6" /> : <AlertTriangle className="h-6 w-6" />}
+            </div>
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-base font-semibold">BATPay - Bayar Online (QRIS & Virtual Account)</h2>
+                <Badge className={cn("rounded-md", active ? "bg-emerald-600 hover:bg-emerald-600" : "bg-amber-500 hover:bg-amber-500")} data-testid="batpay-mode-badge">
+                  {active ? `Aktif - ${cfg.env === "production" ? "Production" : "Sandbox"}` : "Placeholder (belum aktif)"}
+                </Badge>
+              </div>
+              <p className="mt-1 text-sm text-muted-foreground" data-testid="batpay-status-text">
+                {active
+                  ? `Tagihan QRIS/VA dibuat nyata melalui ${cfg.base_url}. Pembayaran yang masuk lewat webhook otomatis mengubah pesanan menjadi Lunas & Selesai.`
+                  : "Kredensial BATPay belum diisi di environment backend. Opsi Bayar Online tampil nonaktif di checkout; pelanggan hanya dapat memakai Cash atau Bayar Nanti."}
+              </p>
+              {!active && missing.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1.5" data-testid="batpay-missing-list">
+                  {missing.map((m) => <Badge key={m} variant="outline" className="rounded-md border-amber-300 bg-white font-mono text-[11px] text-amber-800">{m}</Badge>)}
+                </div>
+              )}
+            </div>
+          </div>
+          <Button variant="outline" onClick={load} className="gap-2 shrink-0" data-testid="batpay-refresh"><RefreshCw className="h-4 w-4" /> Muat Ulang</Button>
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        {/* Biaya layanan */}
+        <Card data-testid="batpay-fee-card">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base"><Percent className="h-4 w-4 text-primary" /> Biaya Layanan (dibebankan ke pembeli)</CardTitle>
+            <CardDescription>Gross-up otomatis dari MDR sehingga dana yang cair ke toko tetap utuh. Diatur lewat env <code className="rounded bg-muted px-1 font-mono text-[11px]">BATPAY_FEE_PERCENT</code> / <code className="rounded bg-muted px-1 font-mono text-[11px]">BATPAY_FEE_FIXED</code>, override per kanal opsional.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="grid grid-cols-3 gap-2 text-sm">
+              {[["default", "Default global"], ["qris", "QRIS"], ["va", "Virtual Account"]].map(([k, label]) => (
+                <div key={k} className="rounded-lg border bg-card p-3" data-testid={`batpay-fee-${k}`}>
+                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</p>
+                  <p className="mt-1 font-semibold">{fmtFee(cfg.fees?.[k])}</p>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">Rumus: total = ceil((dasar + biaya tetap) / (1 - persen/100)); biaya layanan = total - dasar. Contoh {rupiah(100000)} dengan {fmtFee(cfg.fees?.default)} → pembeli membayar {rupiah(100000 + Math.max(0, Math.ceil((100000 + Number(cfg.fees?.default?.fixed || 0)) / (1 - Number(cfg.fees?.default?.percent || 0) / 100) - 1e-9) - 100000))}.</p>
+            <p className="text-xs text-muted-foreground">Masa berlaku tagihan: <b>{cfg.expire_minutes} menit</b>. Biaya layanan dicatat terpisah dan tidak dihitung sebagai pendapatan toko.</p>
+          </CardContent>
+        </Card>
+
+        {/* Kanal */}
+        <Card data-testid="batpay-channels-card">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base"><Landmark className="h-4 w-4 text-primary" /> Kanal Pembayaran</CardTitle>
+            <CardDescription>Kanal yang ditawarkan ke pembeli saat memilih Bayar Online. Bank VA diatur lewat env <code className="rounded bg-muted px-1 font-mono text-[11px]">BATPAY_VA_BANKS</code>.</CardDescription>
+          </CardHeader>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader><TableRow><TableHead>Kanal</TableHead><TableHead>Tipe</TableHead><TableHead className="text-right">Biaya</TableHead><TableHead className="text-right">Status</TableHead></TableRow></TableHeader>
+              <TableBody>
+                {[...qrisChannels, ...vaChannels].map((c) => (
+                  <TableRow key={c.key} data-testid={`batpay-channel-${c.key}`}>
+                    <TableCell className="font-medium">
+                      <span className="flex items-center gap-2">{c.group === "qris" ? <QrCode className="h-4 w-4 text-muted-foreground" /> : <Landmark className="h-4 w-4 text-muted-foreground" />} {c.name}</span>
+                    </TableCell>
+                    <TableCell><Badge variant="secondary" className="rounded-md uppercase">{c.group}</Badge></TableCell>
+                    <TableCell className="text-right text-sm">{fmtFee({ percent: c.fee_percent, fixed: c.fee_fixed })}</TableCell>
+                    <TableCell className="text-right">
+                      <Badge variant="outline" className={cn("rounded-md", active ? "border-emerald-300 text-emerald-700" : "border-amber-300 text-amber-700")}>{active ? "Aktif" : "Placeholder"}</Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* URL & langkah aktivasi */}
+      <Card data-testid="batpay-urls-card">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base"><Webhook className="h-4 w-4 text-primary" /> URL untuk Dashboard BATPay</CardTitle>
+          <CardDescription>Daftarkan kedua URL berikut di dashboard BATPay (menu Callback / Notification). Rahasia API tidak pernah ditampilkan di sini - isi hanya lewat environment variable backend.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <CopyField label="B2B Access Token URL" value={cfg.token_url} testId="batpay-token-url" icon={Link2} />
+            <CopyField label="Webhook / Payment Notification URL" value={cfg.webhook_url} testId="batpay-webhook-url" icon={Webhook} />
+          </div>
+          <div className="grid gap-3 text-sm sm:grid-cols-3">
+            <div className="rounded-lg border p-3"><p className="text-[11px] uppercase tracking-wide text-muted-foreground">Environment</p><p className="mt-1 flex items-center gap-1.5 font-medium"><Globe className="h-4 w-4" /> {cfg.env}</p></div>
+            <div className="rounded-lg border p-3"><p className="text-[11px] uppercase tracking-wide text-muted-foreground">Base URL API</p><p className="mt-1 truncate font-mono text-xs" title={cfg.base_url}>{cfg.base_url}</p></div>
+            <div className="rounded-lg border p-3"><p className="text-[11px] uppercase tracking-wide text-muted-foreground">Verifikasi Webhook</p><p className="mt-1 font-medium" data-testid="batpay-webhook-ready">{cfg.webhook_ready ? (active ? "Signature SNAP" : "Token internal (uji)") : "Belum siap"}</p></div>
+          </div>
+          <ol className="list-decimal space-y-1 pl-5 text-xs text-muted-foreground">
+            <li>Buat pasangan kunci RSA-2048: <code className="rounded bg-muted px-1 font-mono">bash backend/scripts/generate_batpay_keys.sh</code>, unggah <i>public key</i> ke dashboard BATPay.</li>
+            <li>Isi env backend: <code className="rounded bg-muted px-1 font-mono">BATPAY_ENV, BATPAY_CLIENT_KEY, BATPAY_CLIENT_SECRET, BATPAY_PRIVATE_KEY, BATPAY_MERCHANT_ID</code>, lalu restart/redeploy backend.</li>
+            <li>Daftarkan dua URL di atas di dashboard BATPay, kemudian klik <b>Muat Ulang</b> - status harus berubah menjadi <b>Aktif</b>.</li>
+          </ol>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 

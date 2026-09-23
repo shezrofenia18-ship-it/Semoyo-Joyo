@@ -79,6 +79,16 @@ async def update_store_profile(body: StoreProfileIn, owner: User = Depends(get_o
     return StoreProfileOut.model_validate(prof)
 
 
+# =============================== Pembayaran Online (BATPay) ===============================
+@router.get("/payments")
+async def payment_gateway_info(_: User = Depends(get_owner_user)):
+    """Status konfigurasi BATPay (dari environment) + URL yang harus didaftarkan di dashboard BATPay. Rahasia tidak pernah dikembalikan."""
+    from payments.batpay import batpay
+    from routers.payments import app_url
+
+    return batpay.public_config(app_url())
+
+
 # =============================== Akun Staf ===============================
 def _check_owner_password(owner: User, pw: str) -> None:
     if not verify_password(pw, owner.password_hash):
@@ -270,7 +280,7 @@ async def sync_data(owner: User = Depends(get_owner_user), db: AsyncSession = De
         elif Decimal(o.subtotal or 0).quantize(Decimal("0.01")) != item_sum:
             o.subtotal = item_sum
             fixed += 1
-        expected_total = (Decimal(o.subtotal or 0) + Decimal(o.shipping_fee or 0)).quantize(Decimal("0.01"))
+        expected_total = (Decimal(o.subtotal or 0) + Decimal(o.shipping_fee or 0) + Decimal(o.service_fee or 0)).quantize(Decimal("0.01"))
         if Decimal(o.total or 0).quantize(Decimal("0.01")) != expected_total:
             o.total = expected_total
             fixed += 1
@@ -281,16 +291,22 @@ async def sync_data(owner: User = Depends(get_owner_user), db: AsyncSession = De
             o.paid_at = None
             fixed += 1
         if o.payment_method == "cash" and o.payment_status == "pending":
-            o.payment_status = "paid"
-            o.paid_at = o.paid_at or o.created_at
+            o.payment_status = "proses"  # Cash menunggu kasir menerima uang
+            fixed += 1
+        if o.payment_method != "cash" and o.payment_status == "proses":
+            o.payment_status = "piutang" if o.payment_method == "piutang" else "pending"
             fixed += 1
         if o.payment_method == "piutang" and o.payment_status == "pending":
             o.payment_status = "piutang"
             fixed += 1
+        if o.payment_method != "online" and Decimal(o.service_fee or 0) != 0:
+            o.service_fee = Decimal("0")  # biaya layanan hanya untuk Bayar Online
+            o.total = (Decimal(o.subtotal or 0) + Decimal(o.shipping_fee or 0)).quantize(Decimal("0.01"))
+            fixed += 1
         if o.payment_status == "paid" and o.order_status == "baru":
             o.order_status = "diproses"
             fixed += 1
-    add("orders", "Pesanan (subtotal, total, tanggal lunas, status bayar)", len(orders), fixed, warns)
+    add("orders", "Pesanan (subtotal, total, biaya layanan, tanggal lunas, status bayar)", len(orders), fixed, warns)
 
     # 3) Produk & stok: harga beli kosong -> 0; stok negatif; stok vs mutasi terakhir (laporan saja)
     products = (await db.execute(select(Product))).scalars().all()
@@ -323,7 +339,7 @@ async def sync_data(owner: User = Depends(get_owner_user), db: AsyncSession = De
 
     # 6) Piutang: status piutang tapi metode bukan piutang -> laporkan; pesanan dibatalkan dengan status piutang -> tidak dihitung
     recv_rows = (await db.execute(select(Order).where(Order.payment_status == "piutang"))).scalars().all()
-    warns = [f"Pesanan {o.order_number} berstatus piutang dengan metode {o.payment_method}" for o in recv_rows if o.payment_method not in ("piutang", "transfer_va")]
+    warns = [f"Pesanan {o.order_number} berstatus piutang dengan metode {o.payment_method}" for o in recv_rows if o.payment_method != "piutang"]
     add("receivables", "Piutang (status & metode)", len(recv_rows), 0, warns)
 
     await db.flush()

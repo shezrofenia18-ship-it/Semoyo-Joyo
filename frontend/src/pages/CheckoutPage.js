@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Banknote, Landmark, Loader2, ShoppingCart, Info, HandCoins, Clock } from "lucide-react";
+import { Loader2, ShoppingCart, Info } from "lucide-react";
 import { toast } from "sonner";
 import { api, errorMessage } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -9,35 +9,28 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ProductImage } from "@/components/ProductImage";
 import { EmptyState } from "@/components/EmptyState";
+import { PaymentMethodPicker, usePaymentConfig, useFeePreview, channelFee } from "@/components/PaymentMethodPicker";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
-import { rupiah } from "@/lib/format";
-import { cn } from "@/lib/utils";
+import { rupiah, PAYMENT_CHANNEL_LABEL } from "@/lib/format";
 
-const METHODS = [
-  { key: "cash", title: "Cash (Tunai)", desc: "Dibayar langsung, pesanan berstatus Lunas", icon: Banknote, testid: "payment-method-cash" },
-  { key: "piutang", title: "Bayar Nanti", desc: "Ambil barang dulu, tercatat sebagai piutang", icon: HandCoins, testid: "payment-method-piutang" },
-  { key: "transfer_va", title: "Transfer VA", desc: "Virtual Account via Travoy Pay", icon: Landmark, testid: "payment-method-transfer-va", soon: true },
-];
-
-const SUBMIT_LABEL = { cash: "Buat Pesanan (Tunai)", piutang: "Buat Pesanan (Bayar Nanti)", transfer_va: "Buat Pesanan (Transfer VA)" };
+const SUBMIT_LABEL = { cash: "Buat Pesanan (Tunai)", piutang: "Buat Pesanan (Bayar Nanti)", online: "Buat Pesanan & Bayar Online" };
 
 export default function CheckoutPage() {
   const { items, subtotal, clear } = useCart();
   const { user, loginCustomer } = useAuth();
   const navigate = useNavigate();
+  const config = usePaymentConfig();
   const [form, setForm] = useState({ full_name: "", phone: "", address: "", notes: "" });
   const [method, setMethod] = useState("cash");
-  const [vaAvailable, setVaAvailable] = useState(false);
+  const [channel, setChannel] = useState("qris");
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
-
-  useEffect(() => {
-    api.get("/payments/config").then((r) => setVaAvailable(!!r.data.methods?.find((m) => m.key === "transfer_va")?.available)).catch(() => {});
-  }, []);
+  const fee = useFeePreview(subtotal, method === "online");
+  const serviceFee = method === "online" ? channelFee(fee, channel) : 0;
+  const grandTotal = subtotal + serviceFee;
 
   useEffect(() => {
     if (user) setForm((f) => ({ ...f, full_name: f.full_name || user.full_name || "", phone: f.phone || user.phone || "", address: f.address || user.address || "" }));
@@ -49,7 +42,9 @@ export default function CheckoutPage() {
     const digits = form.phone.replace(/\D/g, "");
     if (digits.length < 9) e.phone = "No. Telp/WA tidak valid";
     if (form.address.trim().length < 5) e.address = "Alamat wajib diisi dengan lengkap";
+    if (method === "online" && !config?.online_enabled) e.method = "Bayar Online belum aktif, pilih metode lain";
     setErrors(e);
+    if (e.method) toast.error(e.method);
     return Object.keys(e).length === 0;
   };
 
@@ -64,6 +59,7 @@ export default function CheckoutPage() {
         address: form.address.trim(),
         notes: form.notes.trim() || null,
         payment_method: method,
+        payment_channel: method === "online" ? channel : null,
         items: items.map((i) => ({ product_id: i.product_id, qty: i.qty })),
       };
       const { data } = await api.post("/checkout", payload);
@@ -124,63 +120,13 @@ export default function CheckoutPage() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card data-testid="checkout-payment-card">
             <CardHeader>
               <CardTitle className="font-display text-lg">Metode Pembayaran</CardTitle>
-              <CardDescription>Pilih salah satu metode pembayaran.</CardDescription>
+              <CardDescription>Pilih salah satu: Cash (Tunai), Bayar Nanti, atau Bayar Online.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <RadioGroup value={method} onValueChange={setMethod} className="grid gap-3 sm:grid-cols-3">
-                {METHODS.map(({ key, title, desc, icon: I, testid, soon }) => {
-                  const disabled = soon && !vaAvailable;
-                  return (
-                    <label
-                      key={key}
-                      htmlFor={`pm-${key}`}
-                      data-testid={testid}
-                      aria-disabled={disabled}
-                      className={cn(
-                        "relative flex items-start gap-3 rounded-xl border bg-card p-4 shadow-sm transition-colors",
-                        disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer hover:bg-muted/40",
-                        method === key && "border-primary ring-2 ring-ring"
-                      )}
-                    >
-                      <RadioGroupItem id={`pm-${key}`} value={key} className="mt-0.5" disabled={disabled} />
-                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent text-accent-foreground">
-                        <I className="h-4 w-4" />
-                      </span>
-                      <span className="min-w-0">
-                        <span className="block text-sm font-semibold">{title}</span>
-                        <span className="block text-xs text-muted-foreground">{desc}</span>
-                        {disabled && (
-                          <span className="mt-1.5 inline-flex items-center gap-1 rounded-md border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800" data-testid="transfer-va-soon-badge">
-                            <Clock className="h-3 w-3" /> Segera hadir
-                          </span>
-                        )}
-                      </span>
-                    </label>
-                  );
-                })}
-              </RadioGroup>
-
-              {method === "cash" && (
-                <div className="flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900" data-testid="cash-notice">
-                  <Banknote className="mt-0.5 h-4 w-4 shrink-0" />
-                  <p>Pembayaran diterima tunai di kasir. Pesanan langsung berstatus <b>Lunas</b> dan masuk perhitungan penjualan.</p>
-                </div>
-              )}
-              {method === "piutang" && (
-                <div className="flex items-start gap-2 rounded-xl border border-violet-200 bg-violet-50 p-4 text-sm text-violet-900" data-testid="piutang-notice">
-                  <HandCoins className="mt-0.5 h-4 w-4 shrink-0" />
-                  <p>Pesanan dicatat sebagai <b>piutang (kasbon)</b> dan masuk modul Piutang. Status berubah <b>Lunas</b> setelah admin menandai pembayaran diterima.</p>
-                </div>
-              )}
-              {method === "transfer_va" && (
-                <div className="flex items-start gap-2 rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-900" data-testid="transfer-va-notice">
-                  <Landmark className="mt-0.5 h-4 w-4 shrink-0" />
-                  <p>Nomor Virtual Account Travoy Pay akan ditampilkan di halaman pembayaran. Pesanan berstatus <b>Menunggu Pembayaran</b> sampai transfer terverifikasi.</p>
-                </div>
-              )}
+            <CardContent>
+              <PaymentMethodPicker method={method} onMethodChange={setMethod} channel={channel} onChannelChange={setChannel} amount={subtotal} config={config} idPrefix="checkout" />
             </CardContent>
           </Card>
         </div>
@@ -208,11 +154,17 @@ export default function CheckoutPage() {
               </ul>
               <Separator />
               <div className="space-y-2 text-sm">
-                <div className="flex justify-between"><span className="text-muted-foreground">Subtotal</span><span>{rupiah(subtotal)}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Subtotal</span><span data-testid="checkout-subtotal">{rupiah(subtotal)}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Ongkir</span><span className="text-emerald-700">Dikonfirmasi admin</span></div>
+                {method === "online" && (
+                  <div className="flex justify-between" data-testid="checkout-service-fee-row">
+                    <span className="text-muted-foreground">Biaya Layanan ({PAYMENT_CHANNEL_LABEL[channel] || channel})</span>
+                    <span data-testid="checkout-service-fee">{fee ? rupiah(serviceFee) : "..."}</span>
+                  </div>
+                )}
                 <div className="flex items-center justify-between pt-1">
                   <span className="font-semibold">Total Pembayaran</span>
-                  <span className="font-display text-xl font-semibold" data-testid="checkout-total">{rupiah(subtotal)}</span>
+                  <span className="font-display text-xl font-semibold" data-testid="checkout-total">{rupiah(grandTotal)}</span>
                 </div>
               </div>
               <Button type="submit" disabled={submitting} className="h-11 w-full gap-2 active:scale-[0.98]" data-testid="checkout-submit-button">

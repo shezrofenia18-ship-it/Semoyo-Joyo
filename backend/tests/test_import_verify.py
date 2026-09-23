@@ -38,7 +38,7 @@ def test_health(s):
     j = r.json()
     assert j["status"] == "ok"
     assert j["db_connected"] is True
-    assert j["payment_mode"] == "travoy_placeholder"
+    assert j["payment_mode"] in ("batpay_placeholder", "batpay_sandbox", "batpay_production")
 
 
 # ---------- Public catalog ----------

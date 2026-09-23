@@ -32,7 +32,7 @@ BRAND_YELLOW = "#F5C400"
 LOGO_PATH = Path(__file__).resolve().parent.parent / "assets" / "logo.png"
 
 # Definisi "terjual" terpusat di finance.py (SOLD_FILTER): lunas ATAU piutang selesai; tidak dibatalkan
-PAYMENT_LABEL = {"cash": "Cash (Tunai)", "piutang": "Bayar Nanti", "transfer_va": "Transfer VA"}
+PAYMENT_LABEL = {"cash": "Cash (Tunai)", "piutang": "Bayar Nanti", "online": "Bayar Online (BATPay)"}
 STATUS_LABEL = {"baru": "Baru", "diproses": "Diproses", "dikirim": "Dikirim", "selesai": "Selesai", "dibatalkan": "Dibatalkan"}
 MONTHS_ID = ["", "Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"]
 
@@ -154,7 +154,7 @@ async def build_report(db: AsyncSession, s: date, e: date) -> SalesReportOut:
     total_rev = total_cost = 0.0
     items_sold = 0
     for o, cost, qty in res:
-        rev = float(o.total or 0)
+        rev = float(o.total or 0) - float(o.service_fee or 0)  # pendapatan toko tanpa biaya layanan gateway
         cost_f = float(cost or 0)
         profit = rev - cost_f
         total_rev += rev

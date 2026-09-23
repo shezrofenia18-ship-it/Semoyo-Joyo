@@ -1,10 +1,19 @@
-"""Payment refactor tests: cash / piutang / transfer_va (Travoy placeholder)."""
+"""Tes alur pesanan & pembayaran: Cash (proses -> Selesai/Terima Uang), Bayar Nanti (piutang), Bayar Online (BATPay), ubah metode, webhook.
+
+Jalankan terhadap backend yang berjalan: REACT_APP_BACKEND_URL=<url> python -m pytest tests/test_payments_refactor.py -q
+Mode BATPay placeholder (kredensial kosong) diasumsikan; webhook diuji via BATPAY_WEBHOOK_TOKEN bila diset.
+"""
 import os
 import uuid
+from pathlib import Path
+
 import pytest
 import requests
+from dotenv import load_dotenv
 
-BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://tarik-preview.preview.emergentagent.com").rstrip("/")
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "http://localhost:8001").rstrip("/")
+WEBHOOK_TOKEN = os.environ.get("BATPAY_WEBHOOK_TOKEN", "")
 
 
 @pytest.fixture(scope="module")
@@ -14,7 +23,7 @@ def s():
 
 @pytest.fixture(scope="module")
 def owner_token(s):
-    r = s.post(f"{BASE_URL}/api/admin/login", json={"username": "owner", "password": "owner123"})
+    r = s.post(f"{BASE_URL}/api/admin/login", json={"username": os.environ.get("OWNER_USERNAME", "owner"), "password": os.environ.get("OWNER_PASSWORD", "owner123")})
     assert r.status_code == 200, r.text
     return r.json()["access_token"]
 
@@ -27,72 +36,84 @@ def _h(t):
 def product(s):
     prods = s.get(f"{BASE_URL}/api/products").json()
     items = prods if isinstance(prods, list) else prods.get("items", [])
+    items = [p for p in items if p.get("stock", 0) > 50]
     return items[0]
 
 
-def _payload(product, method):
-    return {
+def _payload(product, method, channel=None):
+    body = {
         "full_name": f"TEST_{uuid.uuid4().hex[:6]}",
         "phone": "081298765432",
         "address": "Jl. Payment Test 1",
         "payment_method": method,
         "items": [{"product_id": product["id"], "qty": max(1, product.get("min_order", 1))}],
     }
+    if channel:
+        body["payment_channel"] = channel
+    return body
 
 
 # ---------- Health & Config ----------
 def test_health_payment_mode(s):
     r = s.get(f"{BASE_URL}/api/health")
     assert r.status_code == 200
-    assert r.json()["payment_mode"] == "travoy_placeholder"
+    assert r.json()["payment_mode"].startswith("batpay_")
 
 
-def test_payments_config(s):
+def test_payments_config_three_methods(s):
     r = s.get(f"{BASE_URL}/api/payments/config")
     assert r.status_code == 200
     j = r.json()
-    methods = {m["key"]: m for m in j["methods"]}
-    assert methods["cash"]["available"] is True
-    assert methods["piutang"]["available"] is True
-    assert methods["transfer_va"]["available"] is False
+    assert [m["key"] for m in j["methods"]] == ["cash", "piutang", "online"]
+    online = j["methods"][2]
+    assert online["available"] == j["online_enabled"]
+    keys = [c["key"] for c in online["channels"]]
+    assert keys[0] == "qris" and any(k.startswith("va_") for k in keys)
+
+
+def test_fee_preview_gross_up(s):
+    r = s.get(f"{BASE_URL}/api/payments/fee", params={"amount": 100000, "channel": "qris"})
+    assert r.status_code == 200
+    j = r.json()
+    assert j["service_fee"] >= 0 and j["total"] == 100000 + j["service_fee"]
+    by = {c["key"]: c for c in j["channels"]}
+    assert by["qris"]["service_fee"] == j["service_fee"]
+    assert by["va_bca"]["total"] == 100000 + by["va_bca"]["service_fee"]
 
 
 # ---------- Cash ----------
 @pytest.fixture(scope="module")
 def cash_order(s, product):
-    # Get baseline sales_revenue
     r = s.post(f"{BASE_URL}/api/checkout", json=_payload(product, "cash"))
     assert r.status_code == 200, r.text
     return r.json()
 
 
-def test_cash_checkout_paid(cash_order):
+def test_cash_checkout_is_proses(cash_order):
     order = cash_order["order"]
-    assert order["payment_status"] == "paid"
-    assert order["paid_at"] is not None
+    assert order["payment_status"] == "proses"
     assert order["order_status"] == "diproses"
-    pay = cash_order["payment"]
-    assert pay["provider"] == "cash"
+    assert order["paid_at"] is None
+    assert order["service_fee"] == 0
+    assert cash_order["payment"]["provider"] == "cash"
 
 
-def test_get_payment_by_order_number(s, cash_order):
-    on = cash_order["order"]["order_number"]
-    r = s.get(f"{BASE_URL}/api/payments/{on}")
-    assert r.status_code == 200
+def test_cash_complete_receive_money(s, cash_order, owner_token):
+    oid = cash_order["order"]["id"]
+    r = s.post(f"{BASE_URL}/api/admin/orders/{oid}/complete-cash", headers=_h(owner_token))
+    assert r.status_code == 200, r.text
     j = r.json()
-    assert j["payment_status"] == "paid"
-    assert j["payment_method"] == "cash"
+    assert j["payment_status"] == "paid" and j["order_status"] == "selesai" and j["paid_at"]
+    # idempoten: kedua kali ditolak
+    r2 = s.post(f"{BASE_URL}/api/admin/orders/{oid}/complete-cash", headers=_h(owner_token))
+    assert r2.status_code == 400
 
 
-def test_cash_order_contributes_to_omzet(s, cash_order, owner_token):
-    r = s.get(f"{BASE_URL}/api/admin/dashboard", headers=_h(owner_token))
-    assert r.status_code == 200
-    # sales_revenue should be >= this order total
-    d = r.json()
-    # Search for finance data
-    total = cash_order["order"]["total"]
-    # Just make sure key exists and is numeric
-    assert "sales_revenue" in d or "gross_profit" in d
+def test_complete_cash_rejected_for_non_cash(s, product, owner_token):
+    r = s.post(f"{BASE_URL}/api/checkout", json=_payload(product, "piutang"))
+    oid = r.json()["order"]["id"]
+    r2 = s.post(f"{BASE_URL}/api/admin/orders/{oid}/complete-cash", headers=_h(owner_token))
+    assert r2.status_code == 400
 
 
 # ---------- Piutang ----------
@@ -118,68 +139,129 @@ def test_piutang_in_receivables(s, piutang_order, owner_token):
 
 def test_piutang_settle(s, piutang_order, owner_token):
     oid = piutang_order["order"]["id"]
-    r = s.post(f"{BASE_URL}/api/admin/orders/{oid}/settle",
-               json={"method": "cash"}, headers=_h(owner_token))
+    r = s.post(f"{BASE_URL}/api/admin/orders/{oid}/settle", json={"method": "cash"}, headers=_h(owner_token))
     assert r.status_code == 200, r.text
-    # Verify via GET
     on = piutang_order["order"]["order_number"]
-    r2 = s.get(f"{BASE_URL}/api/payments/{on}")
-    assert r2.status_code == 200
-    assert r2.json()["payment_status"] == "paid"
+    assert s.get(f"{BASE_URL}/api/payments/{on}").json()["payment_status"] == "paid"
 
 
-# ---------- Transfer VA (Travoy placeholder) ----------
+# ---------- Bayar Online (BATPay) ----------
 @pytest.fixture(scope="module")
-def va_order(s, product):
-    r = s.post(f"{BASE_URL}/api/checkout", json=_payload(product, "transfer_va"))
+def online_order(s, product):
+    r = s.post(f"{BASE_URL}/api/checkout", json=_payload(product, "online", "qris"))
     assert r.status_code == 200, r.text
     return r.json()
 
 
-def test_va_checkout_pending(va_order):
-    order = va_order["order"]
+def test_online_checkout_pending_with_service_fee(online_order):
+    order = online_order["order"]
     assert order["payment_status"] == "pending"
-    pay = va_order["payment"]
-    assert pay["provider"] == "travoy"
-    assert pay["instructions"].get("status") == "awaiting_integration"
+    assert order["payment_method"] == "online" and order["payment_channel"] == "qris"
+    assert order["service_fee"] >= 0
+    assert round(order["total"], 2) == round(order["subtotal"] + order["shipping_fee"] + order["service_fee"], 2)
+    pay = online_order["payment"]
+    assert pay["provider"] == "batpay"
+    assert pay["instructions"]["status"] in ("awaiting_integration", "active")
 
 
-def test_va_status_pending(s, va_order):
-    on = va_order["order"]["order_number"]
+def test_online_va_channel_fee_differs(s, product):
+    r = s.post(f"{BASE_URL}/api/checkout", json=_payload(product, "online", "va_bca"))
+    assert r.status_code == 200, r.text
+    o = r.json()["order"]
+    assert o["payment_channel"] == "va_bca"
+    fee = s.get(f"{BASE_URL}/api/payments/fee", params={"amount": o["subtotal"], "channel": "va_bca"}).json()["service_fee"]
+    assert o["service_fee"] == fee
+
+
+def test_online_status_pending(s, online_order):
+    on = online_order["order"]["order_number"]
     r = s.get(f"{BASE_URL}/api/payments/{on}/status")
     assert r.status_code == 200
     assert r.json()["payment_status"] == "pending"
 
 
-def test_va_switch_to_cash(s, product):
-    # Create a fresh transfer_va order, then switch to cash
-    r = s.post(f"{BASE_URL}/api/checkout", json=_payload(product, "transfer_va"))
-    assert r.status_code == 200
+def test_customer_switch_online_to_cash_removes_fee(s, product):
+    r = s.post(f"{BASE_URL}/api/checkout", json=_payload(product, "online", "qris"))
     on = r.json()["order"]["order_number"]
     r2 = s.post(f"{BASE_URL}/api/payments/{on}/create", json={"payment_method": "cash"})
     assert r2.status_code == 200, r2.text
-    assert r2.json()["payment_status"] == "paid"
+    assert r2.json()["payment_status"] == "proses" and r2.json()["service_fee"] == 0
+    o = s.get(f"{BASE_URL}/api/orders/{on}").json()
+    assert o["total"] == o["subtotal"] + o["shipping_fee"]
 
 
-# ---------- Rejected legacy methods ----------
-@pytest.mark.parametrize("method", ["cod", "bank_transfer", "qris", "ewallet"])
+# ---------- Admin: Ubah Metode Pembayaran ----------
+def test_admin_change_method_cash_to_piutang(s, product, owner_token):
+    r = s.post(f"{BASE_URL}/api/checkout", json=_payload(product, "cash"))
+    oid = r.json()["order"]["id"]
+    r2 = s.patch(f"{BASE_URL}/api/admin/orders/{oid}/payment-method", json={"payment_method": "piutang"}, headers=_h(owner_token))
+    assert r2.status_code == 200, r2.text
+    assert r2.json()["payment_status"] == "piutang" and r2.json()["payment_method"] == "piutang"
+
+
+def test_admin_change_method_to_online_adds_fee(s, product, owner_token):
+    r = s.post(f"{BASE_URL}/api/checkout", json=_payload(product, "cash"))
+    o = r.json()["order"]
+    r2 = s.patch(f"{BASE_URL}/api/admin/orders/{o['id']}/payment-method", json={"payment_method": "online", "payment_channel": "va_mandiri"}, headers=_h(owner_token))
+    assert r2.status_code == 200, r2.text
+    j = r2.json()
+    assert j["payment_method"] == "online" and j["payment_channel"] == "va_mandiri" and j["payment_status"] == "pending"
+    assert j["total"] == o["subtotal"] + o["shipping_fee"] + j["service_fee"]
+
+
+def test_admin_change_method_rejected_when_paid(s, product, owner_token):
+    r = s.post(f"{BASE_URL}/api/checkout", json=_payload(product, "cash"))
+    oid = r.json()["order"]["id"]
+    s.post(f"{BASE_URL}/api/admin/orders/{oid}/complete-cash", headers=_h(owner_token))
+    r2 = s.patch(f"{BASE_URL}/api/admin/orders/{oid}/payment-method", json={"payment_method": "piutang"}, headers=_h(owner_token))
+    assert r2.status_code == 400
+
+
+# ---------- Webhook BATPay ----------
+def test_webhook_rejects_without_credentials(s, online_order):
+    on = online_order["order"]["order_number"]
+    r = s.post(f"{BASE_URL}/api/payments/batpay/webhook", json={"originalPartnerReferenceNo": on, "latestTransactionStatus": "00"})
+    assert r.status_code in (401, 503)
+    assert s.get(f"{BASE_URL}/api/payments/{on}").json()["payment_status"] == "pending"
+
+
+@pytest.mark.skipif(not WEBHOOK_TOKEN, reason="BATPAY_WEBHOOK_TOKEN tidak diset")
+def test_webhook_marks_paid_with_internal_token(s, product):
+    r = s.post(f"{BASE_URL}/api/checkout", json=_payload(product, "online", "qris"))
+    o = r.json()["order"]
+    body = {"originalPartnerReferenceNo": o["order_number"], "originalReferenceNo": "R-TEST", "latestTransactionStatus": "00",
+            "transactionStatusDesc": "success", "amount": {"value": f"{o['total']:.2f}", "currency": "IDR"}}
+    r2 = s.post(f"{BASE_URL}/api/payments/batpay/webhook", json=body, headers={"X-CALLBACK-TOKEN": WEBHOOK_TOKEN})
+    assert r2.status_code == 200, r2.text
+    assert r2.json()["responseCode"] == "2005200"
+    j = s.get(f"{BASE_URL}/api/orders/{o['order_number']}").json()
+    assert j["payment_status"] == "paid" and j["order_status"] == "selesai" and j["paid_at"]
+
+
+@pytest.mark.skipif(not WEBHOOK_TOKEN, reason="BATPAY_WEBHOOK_TOKEN tidak diset")
+def test_webhook_rejects_amount_mismatch(s, product):
+    r = s.post(f"{BASE_URL}/api/checkout", json=_payload(product, "online", "va_bca"))
+    o = r.json()["order"]
+    body = {"trxId": o["order_number"], "paymentRequestId": "P-1", "paidAmount": {"value": "1.00", "currency": "IDR"}}
+    r2 = s.post(f"{BASE_URL}/api/payments/batpay/webhook", json=body, headers={"X-CALLBACK-TOKEN": WEBHOOK_TOKEN})
+    assert r2.status_code == 404 and r2.json()["responseCode"] == "4045213"
+    assert s.get(f"{BASE_URL}/api/orders/{o['order_number']}").json()["payment_status"] == "pending"
+
+
+# ---------- Metode lama ditolak / endpoint lama hilang ----------
+@pytest.mark.parametrize("method", ["cod", "bank_transfer", "qris", "ewallet", "transfer_va"])
 def test_legacy_methods_rejected(s, product, method):
     r = s.post(f"{BASE_URL}/api/checkout", json=_payload(product, method))
     assert r.status_code == 422, f"{method} expected 422 got {r.status_code}"
 
 
-# ---------- Legacy endpoints removed ----------
-def test_travoy_notification_disabled(s):
-    r = s.post(f"{BASE_URL}/api/payments/travoy/notification", json={"order_number": "SJ-nope"})
-    assert r.status_code == 503
+@pytest.mark.parametrize("path", ["/api/payments/simulate", "/api/payments/notification"])
+def test_old_gateway_endpoints_gone(s, path):
+    """Endpoint gateway lama sudah dicabut total - hanya /api/payments/batpay/* yang ada."""
+    assert s.post(f"{BASE_URL}{path}", json={}).status_code in (404, 405)
 
 
-def test_old_simulate_endpoint_gone(s, cash_order):
-    on = cash_order["order"]["order_number"]
-    r = s.post(f"{BASE_URL}/api/payments/{on}/simulate", json={})
-    assert r.status_code == 404
-
-
-def test_old_midtrans_notification_gone(s):
-    r = s.post(f"{BASE_URL}/api/payments/midtrans/notification", json={})
-    assert r.status_code == 404
+def test_batpay_inbound_token_requires_credentials(s):
+    r = s.post(f"{BASE_URL}/api/payments/batpay/access-token/b2b", json={"grantType": "client_credentials"})
+    assert r.status_code in (400, 401, 503)
+    assert "responseCode" in r.json()
