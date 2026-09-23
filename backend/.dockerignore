@@ -1,0 +1,14 @@
+# Jangan ikutkan ke image Docker
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.env
+.env.*
+!.env.example
+uploads/
+pgdata/
+pglog/
+test_core.py
+tests/
+*.md

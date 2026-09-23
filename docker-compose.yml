@@ -1,0 +1,62 @@
+# Coolify / VPS deployment: PostgreSQL + FastAPI backend + React (nginx) frontend
+# Usage: copy .env.example -> .env, edit values, then `docker compose up -d --build`
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-mbg_erp}
+      POSTGRES_USER: ${POSTGRES_USER:-mbg_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_this_password}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mbg_user} -d ${POSTGRES_DB:-mbg_erp}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-mbg_user}:${POSTGRES_PASSWORD:-change_this_password}@postgres:5432/${POSTGRES_DB:-mbg_erp}
+      AUTO_START_LOCAL_PG: "false"
+      CORS_ORIGINS: ${CORS_ORIGINS:-*}
+      JWT_SECRET: ${JWT_SECRET:-please-change-this-secret}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
+      OWNER_USERNAME: ${OWNER_USERNAME:-owner}
+      OWNER_PASSWORD: ${OWNER_PASSWORD:-owner123}
+      APP_URL: ${APP_URL:-}
+      TRAVOY_API_KEY: ${TRAVOY_API_KEY:-}
+      TRAVOY_BASE_URL: ${TRAVOY_BASE_URL:-}
+      TRAVOY_CALLBACK_TOKEN: ${TRAVOY_CALLBACK_TOKEN:-}
+    volumes:
+      - uploads:/app/uploads
+    expose:
+      - "8001"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - backend
+    expose:
+      - "80"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:80/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:
+  uploads:
+  
