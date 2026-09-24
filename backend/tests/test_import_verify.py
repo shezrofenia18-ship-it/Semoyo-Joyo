@@ -5,7 +5,7 @@ import uuid
 import pytest
 import requests
 
-BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://tarik-preview.preview.emergentagent.com").rstrip("/")
+BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://batpay-e2e-testing.preview.emergentagent.com").rstrip("/")
 
 
 @pytest.fixture(scope="module")
@@ -38,7 +38,7 @@ def test_health(s):
     j = r.json()
     assert j["status"] == "ok"
     assert j["db_connected"] is True
-    assert j["payment_mode"] == "travoy_placeholder"
+    assert j["payment_mode"] in ("batpay_placeholder", "batpay_sandbox", "batpay_production")
 
 
 # ---------- Public catalog ----------

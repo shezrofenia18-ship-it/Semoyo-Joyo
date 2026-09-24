@@ -96,12 +96,12 @@ async def checkout(body: CheckoutIn, db: AsyncSession = Depends(get_db)):
     user = await find_or_create_customer(db, body.full_name, phone, body.address)
     order_number = await generate_order_number(db)
     shipping = Decimal("0")
-    total = subtotal + shipping
 
     order = Order(
         order_number=order_number, user_id=user.id, customer_name=user.full_name, phone=phone, address=body.address,
-        notes=body.notes, subtotal=subtotal, shipping_fee=shipping, total=total,
-        payment_method=body.payment_method, payment_channel=None, payment_status="pending", order_status="baru",
+        notes=body.notes, subtotal=subtotal, shipping_fee=shipping, service_fee=Decimal("0"), total=subtotal + shipping,
+        payment_method=body.payment_method, payment_channel=body.payment_channel if body.payment_method == "online" else None,
+        payment_status="pending", order_status="baru",
     )
     order.items = order_items
     db.add(order)
@@ -110,14 +110,12 @@ async def checkout(body: CheckoutIn, db: AsyncSession = Depends(get_db)):
         db.add(mv)
     await db.flush()
 
-    try:
-        charge = await build_charge(order)
-    except NotImplementedError as exc:
-        raise HTTPException(501, str(exc))
+    charge = await build_charge(order)  # menghitung biaya layanan (online) & total akhir
     db.add(apply_charge(order, charge))
     await db.commit()
 
     order = (await db.execute(select(Order).where(Order.id == order.id))).scalar_one()
+    total = order.total
     broadcaster.publish("order.new", {
         "order_id": order.id, "order_number": order_number, "customer_name": user.full_name, "total": float(total),
         "payment_method": body.payment_method, "payment_status": order.payment_status, "items": len(order_items),
@@ -127,8 +125,8 @@ async def checkout(body: CheckoutIn, db: AsyncSession = Depends(get_db)):
         access_token=create_token(user),
         user=UserOut.model_validate(user),
         payment={
-            "order_number": order_number, "payment_method": body.payment_method, "payment_status": order.payment_status,
-            "amount": float(total), "provider": charge["provider"], "instructions": charge["instructions"],
+            "order_number": order_number, "payment_method": body.payment_method, "payment_channel": order.payment_channel, "payment_status": order.payment_status,
+            "amount": float(total), "service_fee": float(order.service_fee or 0), "provider": charge["provider"], "instructions": charge["instructions"],
         },
     )
 

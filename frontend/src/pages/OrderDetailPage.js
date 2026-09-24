@@ -8,7 +8,7 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ProductImage } from "@/components/ProductImage";
 import { PaymentStatusBadge, OrderStatusBadge } from "@/components/StatusBadge";
-import { rupiah, formatDate, PAYMENT_METHOD_LABEL, ORDER_STATUS_LABEL } from "@/lib/format";
+import { rupiah, formatDate, paymentLabel, ORDER_STATUS_LABEL } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 const STEPS = ["baru", "diproses", "dikirim", "selesai"];
@@ -80,11 +80,15 @@ export default function OrderDetailPage() {
         </CardContent>
       </Card>
 
-      {order.payment_status === "pending" && (
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
-          <p className="text-sm text-amber-900">Pesanan menunggu pembayaran. Selesaikan pembayaran agar segera diproses.</p>
+      {(order.payment_status === "pending" || order.payment_status === "proses") && order.order_status !== "dibatalkan" && (
+        <div className={cn("mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4", order.payment_status === "proses" ? "border-sky-200 bg-sky-50" : "border-amber-200 bg-amber-50")}>
+          <p className={cn("text-sm", order.payment_status === "proses" ? "text-sky-900" : "text-amber-900")}>
+            {order.payment_status === "proses"
+              ? `Pesanan diproses. Bayar tunai ${rupiah(order.total)} ke kasir saat pesanan diterima.`
+              : "Pesanan menunggu pembayaran online. Selesaikan pembayaran agar segera diproses."}
+          </p>
           <Link to={`/pembayaran/${order.order_number}`}>
-            <Button size="sm" className="gap-2" data-testid="order-detail-pay-button"><CreditCard className="h-4 w-4" /> Lanjutkan Pembayaran</Button>
+            <Button size="sm" className="gap-2" data-testid="order-detail-pay-button"><CreditCard className="h-4 w-4" /> {order.payment_status === "proses" ? "Lihat Instruksi Bayar" : "Lanjutkan Pembayaran"}</Button>
           </Link>
         </div>
       )}
@@ -109,6 +113,7 @@ export default function OrderDetailPage() {
             <div className="space-y-1.5 text-sm">
               <div className="flex justify-between"><span className="text-muted-foreground">Subtotal</span><span>{rupiah(order.subtotal)}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Ongkir</span><span>{order.shipping_fee > 0 ? rupiah(order.shipping_fee) : "-"}</span></div>
+              {Number(order.service_fee) > 0 && <div className="flex justify-between" data-testid="order-detail-service-fee"><span className="text-muted-foreground">Biaya Layanan</span><span>{rupiah(order.service_fee)}</span></div>}
               <div className="flex justify-between pt-1"><span className="font-semibold">Total</span><span className="font-display text-lg font-semibold">{rupiah(order.total)}</span></div>
             </div>
           </CardContent>
@@ -117,7 +122,7 @@ export default function OrderDetailPage() {
           <Card>
             <CardHeader className="pb-3"><CardTitle className="text-base">Pembayaran</CardTitle></CardHeader>
             <CardContent className="space-y-1 text-sm">
-              <p className="font-medium">{PAYMENT_METHOD_LABEL[order.payment_method] || order.payment_method}</p>
+              <p className="font-medium" data-testid="order-detail-payment-method">{paymentLabel(order)}</p>
               {order.paid_at && <p className="text-muted-foreground">Lunas {formatDate(order.paid_at)}</p>}
               {order.payment_ref && <p className="break-all text-xs text-muted-foreground">Ref: {order.payment_ref}</p>}
             </CardContent>

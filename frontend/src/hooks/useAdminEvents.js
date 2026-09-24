@@ -41,6 +41,14 @@ function browserNotify(title, body) {
   }
 }
 
+/** Label metode pembayaran untuk notifikasi admin (selaras dengan 3 metode checkout: cash / piutang / online). */
+const METHOD_LABEL = {
+  cash: "Cash (Tunai) - Proses",
+  piutang: "Bayar Nanti (Piutang)",
+  online: "Bayar Online (BATPay) - menunggu",
+};
+const methodLabel = (m) => METHOD_LABEL[m] || m || "-";
+
 /**
  * Terhubung ke SSE /api/admin/events dan menampilkan push notification saat ada
  * pesanan masuk / pembayaran lunas. Mengembalikan { connected, unread, clearUnread, requestPermission }.
@@ -80,7 +88,7 @@ export function useAdminEvents(enabled = true) {
           return u + 1;
         });
         beep();
-        const body = `${data.customer_name} · ${rupiah(data.total)} · ${{ cash: "Tunai (Lunas)", piutang: "Bayar Nanti (Piutang)", transfer_va: "Transfer VA (menunggu)" }[data.payment_method] || data.payment_method}`;
+        const body = `${data.customer_name} · ${rupiah(data.total)} · ${methodLabel(data.payment_method)}`;
         toast.success(`Pesanan baru ${data.order_number}`, {
           description: body,
           duration: 12000,
@@ -92,7 +100,8 @@ export function useAdminEvents(enabled = true) {
       es.addEventListener("payment.paid", (e) => {
         const { data } = JSON.parse(e.data);
         beep();
-        const body = `${data.customer_name} · ${rupiah(data.total)}`;
+        const paidVia = { cash: "Cash (Tunai)", piutang: "Pelunasan Piutang", online: "Bayar Online (BATPay)" }[data.payment_method];
+        const body = `${data.customer_name} · ${rupiah(data.total)}${paidVia ? ` · ${paidVia}` : ""}`;
         toast.success(`Pembayaran lunas ${data.order_number}`, {
           description: body,
           duration: 10000,

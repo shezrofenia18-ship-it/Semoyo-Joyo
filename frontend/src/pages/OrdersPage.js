@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/EmptyState";
 import { PaymentStatusBadge, OrderStatusBadge } from "@/components/StatusBadge";
-import { rupiah, formatDate, PAYMENT_METHOD_LABEL } from "@/lib/format";
+import { rupiah, formatDate, paymentLabel } from "@/lib/format";
 
 export default function OrdersPage() {
   const { user, checking } = useAuth();
@@ -72,15 +72,15 @@ export default function OrdersPage() {
                       <OrderStatusBadge status={o.order_status} />
                     </div>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      {formatDate(o.created_at)} &middot; {o.items.length} produk &middot; {PAYMENT_METHOD_LABEL[o.payment_method]}
+                      {formatDate(o.created_at)} &middot; {o.items.length} produk &middot; {paymentLabel(o)}
                     </p>
                     <p className="mt-1 truncate text-sm text-muted-foreground">{o.items.map((i) => `${i.product_name} x${i.qty}`).join(", ")}</p>
                   </div>
                   <div className="text-right">
                     <p className="font-display text-lg font-semibold">{rupiah(o.total)}</p>
-                    {o.payment_status === "pending" && (
+                    {(o.payment_status === "pending" || o.payment_status === "proses") && o.order_status !== "dibatalkan" && (
                       <Button size="sm" variant="secondary" className="mt-1" onClick={(e) => { e.preventDefault(); navigate(`/pembayaran/${o.order_number}`); }} data-testid="order-pay-now-button">
-                        Bayar Sekarang
+                        {o.payment_status === "proses" ? "Instruksi Bayar" : "Bayar Sekarang"}
                       </Button>
                     )}
                   </div>

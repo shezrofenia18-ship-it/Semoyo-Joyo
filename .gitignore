@@ -97,3 +97,10 @@ frontend/node_modules/.cache/default-development/8.pack
 !.env.example
 frontend/node_modules/.cache/default-development/2.pack
 frontend/node_modules/.cache/default-development/11.pack
+frontend/node_modules/.cache/default-development/1.pack
+frontend/node_modules/.cache/default-development/0.pack
+
+# Platform runtime files (Emergent workspace)
+.emergent/cron/
+.emergent/emergent_todos.json
+/yarn.lock

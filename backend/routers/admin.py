@@ -21,8 +21,9 @@ from finance import COST_EXPR, RECEIVABLE_FILTER, SOLD_FILTER, receivables_total
 from models import AuditLog, Category, Expense, Order, OrderItem, PaymentTransaction, Product, StockMovement, User
 from routers.expenses import monthly_expense_total
 from routers.catalog import product_out
+from routers.payments import add_transaction, apply_charge, build_charge, cancel_remote_charge, mark_paid, recompute_total, sync_remote_status
 from schemas import (
-    AdminLoginIn, AuditLogOut, CategoryIn, CategoryOut, DashboardOut, OrderOut, OrderStatusUpdateIn, OrderUpdateIn, ProductIn, ProductOut,
+    AdminLoginIn, AuditLogOut, CategoryIn, CategoryOut, DashboardOut, OrderOut, OrderStatusUpdateIn, OrderUpdateIn, PaymentMethodChangeIn, ProductIn, ProductOut,
     ProductProfitOut, ReceivableCustomerOut, ReceivablesOut, SettleIn, StockAdjustIn, StockItemOut, StockMovementOut, StockSummaryOut, TokenOut, UserOut,
 )
 
@@ -431,9 +432,14 @@ async def update_order(order_id: str, body: OrderUpdateIn, admin: User = Depends
         o.address = body.address.strip()
     if body.notes is not None:
         o.notes = body.notes.strip() or None
-    if body.shipping_fee is not None:
-        o.shipping_fee = body.shipping_fee
-        o.total = o.subtotal + Decimal(str(body.shipping_fee))
+    if body.shipping_fee is not None and Decimal(str(body.shipping_fee)) != Decimal(o.shipping_fee or 0):
+        o.shipping_fee = Decimal(str(body.shipping_fee))
+        if o.payment_method == "online" and o.payment_status != "paid" and o.order_status != "dibatalkan":
+            # nominal tagihan berubah -> tagihan BATPay dibuat ulang (biaya layanan dihitung ulang)
+            await cancel_remote_charge(o)
+            db.add(apply_charge(o, await build_charge(o)))
+        else:
+            recompute_total(o)
     await _apply_order_changes(db, o, body.order_status, body.payment_status, admin)
     log_action(db, admin, "update", "order", f"Mengedit data pesanan {o.order_number} ({', '.join(body.model_dump(exclude_none=True).keys())})",
                entity_id=o.id, entity_label=o.order_number, meta=body.model_dump(exclude_none=True))
@@ -511,6 +517,76 @@ async def settle_order(order_id: str, body: SettleIn, admin: User = Depends(get_
     await db.commit()
     await db.refresh(o)
     broadcaster.publish("payment.paid", {"order_id": o.id, "order_number": o.order_number, "customer_name": o.customer_name, "total": float(o.total), "payment_method": o.payment_method})
+    return OrderOut.model_validate(o)
+
+
+async def _load_order(db: AsyncSession, order_id: str) -> Order:
+    o = (await db.execute(select(Order).where((Order.id == order_id) | (Order.order_number == order_id)))).scalar_one_or_none()
+    if not o:
+        raise HTTPException(404, "Pesanan tidak ditemukan")
+    return o
+
+
+@router.post("/orders/{order_id}/complete-cash", response_model=OrderOut)
+async def complete_cash_order(order_id: str, admin: User = Depends(get_admin_user), db: AsyncSession = Depends(get_db)):
+    """Tombol "Selesai / Terima Uang" (Cash): kasir menerima uang tunai -> pembayaran LUNAS & pesanan SELESAI."""
+    o = await _load_order(db, order_id)
+    if o.order_status == "dibatalkan":
+        raise HTTPException(400, "Pesanan sudah dibatalkan")
+    if o.payment_status == "paid":
+        raise HTTPException(400, "Pesanan sudah lunas")
+    if o.payment_method != "cash":
+        raise HTTPException(400, "Aksi ini khusus pesanan Cash (Tunai). Ubah metode pembayaran ke Cash terlebih dahulu atau gunakan 'Tandai Lunas'.")
+    was = o.payment_status
+    o.paid_at = datetime.now(timezone.utc)
+    mark_paid(o, complete=True)
+    o.payment_payload = {**(o.payment_payload or {}), "settled": {"method": "cash", "note": "Selesai / Terima Uang", "by": admin.username, "at": o.paid_at.isoformat()}}
+    add_transaction(db, o, provider="cash", status="paid", reference=f"CASH-{o.order_number}", raw={"from_status": was, "by": admin.username, "action": "complete_cash"})
+    log_action(db, admin, "settle", "order", f"Terima uang tunai pesanan {o.order_number} ({o.customer_name}) Rp {float(o.total):,.0f} - pesanan selesai",
+               entity_id=o.id, entity_label=o.order_number, meta={"from": was, "method": "cash", "amount": float(o.total), "action": "complete_cash"})
+    await db.commit()
+    await db.refresh(o)
+    broadcaster.publish("order.updated", {"order_number": o.order_number, "order_status": o.order_status, "payment_status": o.payment_status, "by": admin.username})
+    return OrderOut.model_validate(o)
+
+
+@router.patch("/orders/{order_id}/payment-method", response_model=OrderOut)
+async def change_payment_method(order_id: str, body: PaymentMethodChangeIn, admin: User = Depends(get_admin_user), db: AsyncSession = Depends(get_db)):
+    """"Ubah Metode Pembayaran": admin mengganti pilihan pelanggan selama pesanan belum lunas (Cash <-> Bayar Nanti <-> Bayar Online)."""
+    o = await _load_order(db, order_id)
+    if o.order_status == "dibatalkan":
+        raise HTTPException(400, "Pesanan sudah dibatalkan")
+    if o.payment_status == "paid":
+        raise HTTPException(400, "Pesanan sudah lunas, metode pembayaran tidak dapat diubah")
+    old_method, old_channel, old_total = o.payment_method, o.payment_channel, float(o.total)
+    if body.payment_method == old_method and (body.payment_method != "online" or (body.payment_channel or old_channel) == old_channel):
+        raise HTTPException(400, "Metode pembayaran tidak berubah")
+    await cancel_remote_charge(o)
+    o.payment_method = body.payment_method
+    o.payment_channel = body.payment_channel if body.payment_method == "online" else None
+    charge = await build_charge(o)
+    if o.order_status == "selesai":  # pesanan yang sudah selesai tidak diturunkan statusnya
+        charge["order_status"] = None
+    db.add(apply_charge(o, charge))
+    o.payment_payload = {**(o.payment_payload or {}), "method_changed": {"from": old_method, "from_channel": old_channel, "to": o.payment_method, "to_channel": o.payment_channel,
+                                                                        "by": admin.username, "note": body.note, "at": datetime.now(timezone.utc).isoformat()}}
+    label = {"cash": "Cash", "piutang": "Bayar Nanti", "online": "Bayar Online"}
+    log_action(db, admin, "update", "order",
+               f"Mengubah metode pembayaran pesanan {o.order_number}: {label.get(old_method, old_method)} -> {label.get(o.payment_method, o.payment_method)}"
+               + (f" ({o.payment_channel})" if o.payment_channel else "") + (f", total Rp {old_total:,.0f} -> Rp {float(o.total):,.0f}" if float(o.total) != old_total else "")
+               + (f" - {body.note.strip()}" if body.note and body.note.strip() else ""),
+               entity_id=o.id, entity_label=o.order_number, meta={"from": old_method, "to": o.payment_method, "channel": o.payment_channel, "total": float(o.total)})
+    await db.commit()
+    await db.refresh(o)
+    broadcaster.publish("order.updated", {"order_number": o.order_number, "order_status": o.order_status, "payment_status": o.payment_status, "by": admin.username})
+    return OrderOut.model_validate(o)
+
+
+@router.post("/orders/{order_id}/sync-payment", response_model=OrderOut)
+async def sync_payment(order_id: str, _: User = Depends(get_admin_user), db: AsyncSession = Depends(get_db)):
+    """Cek status tagihan Bayar Online langsung ke BATPay (fallback bila webhook belum masuk)."""
+    o = await _load_order(db, order_id)
+    await sync_remote_status(db, o)
     return OrderOut.model_validate(o)
 
 

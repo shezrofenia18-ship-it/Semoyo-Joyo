@@ -19,13 +19,31 @@ export const formatDateOnly = (iso) => {
 
 export const daysSince = (iso) => (iso ? Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 86400000)) : 0);
 
+/** Tiga metode pembayaran resmi: Cash, Bayar Nanti (piutang), Bayar Online (BATPay). */
 export const PAYMENT_METHOD_LABEL = {
   cash: "Cash (Tunai)",
   piutang: "Bayar Nanti (Piutang)",
-  transfer_va: "Transfer VA (Travoy Pay)",
+  online: "Bayar Online (BATPay)",
+};
+
+/** Kanal Bayar Online BATPay. */
+export const PAYMENT_CHANNEL_LABEL = {
+  qris: "QRIS",
+  va_bca: "Virtual Account BCA",
+  va_mandiri: "Virtual Account Mandiri",
+  va_cimb: "Virtual Account CIMB Niaga",
+  va_danamon: "Virtual Account Danamon",
+};
+
+export const paymentLabel = (order) => {
+  if (!order) return "-";
+  const base = PAYMENT_METHOD_LABEL[order.payment_method] || order.payment_method;
+  if (order.payment_method === "online" && order.payment_channel) return `${base} · ${PAYMENT_CHANNEL_LABEL[order.payment_channel] || order.payment_channel}`;
+  return base;
 };
 
 export const PAYMENT_STATUS_LABEL = {
+  proses: "Proses (Bayar di Kasir)",
   pending: "Menunggu Pembayaran",
   paid: "Lunas",
   failed: "Gagal",

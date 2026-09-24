@@ -20,7 +20,7 @@ from starlette.middleware.cors import CORSMiddleware  # noqa: E402
 
 from database import AsyncSessionLocal, Base, engine, ensure_local_postgres, get_db  # noqa: E402
 import models  # noqa: E402,F401  (register tables)
-from payments.travoy import travoy  # noqa: E402
+from payments.batpay import batpay  # noqa: E402
 from routers import admin, catalog, customer, expenses, payments, reports, settings  # noqa: E402
 from seed import seed_if_empty  # noqa: E402
 
@@ -38,10 +38,16 @@ async def _run_light_migrations(conn) -> None:
         # Produk lama tanpa modal: isi default 80% harga jual (sekali saja) agar laba/rugi langsung terlihat
         await conn.execute(text("UPDATE products SET cost_price = ROUND(price * 0.8, 0) WHERE price > 0"))
     await conn.execute(text("ALTER TABLE order_items ADD COLUMN IF NOT EXISTS cost_price NUMERIC(14,2)"))
-    # Metode pembayaran lama (Midtrans) -> skema baru: cash | piutang | transfer_va
+    # Biaya layanan Bayar Online (BATPay) - pass-through, ditambahkan ke total
+    await conn.execute(text("ALTER TABLE orders ADD COLUMN IF NOT EXISTS service_fee NUMERIC(14,2) NOT NULL DEFAULT 0"))
+    # Skema metode pembayaran lama -> 3 metode saat ini: cash | piutang | online
     await conn.execute(text("UPDATE orders SET payment_method='cash', payment_status='pending' WHERE payment_method='cod' AND payment_status='cod'"))
     await conn.execute(text("UPDATE orders SET payment_method='cash' WHERE payment_method='cod'"))
-    await conn.execute(text("UPDATE orders SET payment_method='transfer_va', payment_channel=NULL WHERE payment_method IN ('bank_transfer','qris','ewallet')"))
+    await conn.execute(text("UPDATE orders SET payment_method='online', payment_channel=NULL WHERE payment_method IN ('bank_transfer','qris','ewallet','transfer_va')"))
+    # Transaksi gateway lama (provider apa pun selain cash/manual) dipetakan ke provider Bayar Online saat ini
+    await conn.execute(text("UPDATE payment_transactions SET provider='batpay' WHERE provider NOT IN ('cash','manual','batpay')"))
+    # Cash lama yang belum lunas mengikuti alur baru: status bayar "proses"
+    await conn.execute(text("UPDATE orders SET payment_status='proses' WHERE payment_method='cash' AND payment_status='pending'"))
 
 
 async def _init_db_with_retry(attempts: int = 8) -> None:
@@ -68,7 +74,7 @@ async def _init_db_with_retry(attempts: int = 8) -> None:
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     await _init_db_with_retry()
-    logger.info("MBG backend ready. Payment mode: %s", travoy.mode)
+    logger.info("MBG backend ready. Payment mode: %s", batpay.mode)
     yield
     await engine.dispose()
 
@@ -91,7 +97,7 @@ async def health(db: AsyncSession = Depends(get_db)):
         db_ok = True
     except Exception as exc:  # pragma: no cover
         logger.error("health db check failed: %s", exc)
-    return {"status": "ok" if db_ok else "degraded", "database": "postgresql", "db_connected": db_ok, "payment_mode": travoy.mode}
+    return {"status": "ok" if db_ok else "degraded", "database": "postgresql", "db_connected": db_ok, "payment_mode": batpay.mode}
 
 
 api_router.include_router(catalog.router)

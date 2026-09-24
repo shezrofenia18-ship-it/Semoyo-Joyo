@@ -3,6 +3,7 @@ import { CUSTOMER_SEGMENT_LABEL, ORDER_STATUS_LABEL, PAYMENT_STATUS_LABEL } from
 import { cn } from "@/lib/utils";
 
 const PAYMENT = {
+  proses: "bg-sky-50 text-sky-800 border-sky-200",
   pending: "bg-amber-50 text-amber-800 border-amber-200",
   paid: "bg-emerald-50 text-emerald-800 border-emerald-200",
   failed: "bg-rose-50 text-rose-800 border-rose-200",

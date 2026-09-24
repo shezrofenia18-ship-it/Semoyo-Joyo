@@ -3,10 +3,11 @@
 Dipakai oleh Dashboard, Laporan, Piutang, dan Sinkronisasi Data agar semua angka konsisten.
 
 Definisi "terjual" (pendapatan diakui):
-  - payment_status = paid (lunas; pembayaran Cash langsung lunas), ATAU
+  - payment_status = paid (lunas; Cash lunas setelah kasir klik "Selesai / Terima Uang"), ATAU
   - metode Piutang (bayar nanti) dan pesanan selesai (barang sudah diterima pelanggan)
   dan pesanan tidak dibatalkan.
 
+Pendapatan toko = total - biaya layanan (biaya layanan Bayar Online adalah pass-through ke BATPay, bukan omzet toko).
 Piutang (accounts receivable) = pesanan payment_status = piutang yang belum dibatalkan (belum dibayar).
 Pengeluaran = tabel expenses. Laba bersih = laba kotor - pengeluaran.
 """
@@ -27,6 +28,9 @@ SOLD_FILTER = (
 ) & (Order.order_status != "dibatalkan")
 
 RECEIVABLE_FILTER = (Order.payment_status == "piutang") & (Order.order_status != "dibatalkan")
+
+# Pendapatan toko per pesanan (tanpa biaya layanan payment gateway)
+REVENUE_EXPR = Order.total - func.coalesce(Order.service_fee, 0)
 
 # HPP per item: snapshot cost_price saat pesanan; fallback harga beli produk saat ini; fallback 0
 COST_EXPR = func.coalesce(OrderItem.cost_price, Product.cost_price, 0)
@@ -60,7 +64,7 @@ def _range(stmt, start: Optional[datetime], end: Optional[datetime]):
 
 async def sales_totals(db: AsyncSession, start: Optional[datetime] = None, end: Optional[datetime] = None) -> tuple[float, float, int, int]:
     """(revenue, cost, sold_orders, items_sold) untuk pesanan terjual pada rentang waktu."""
-    rev_stmt = _range(select(func.coalesce(func.sum(Order.total), 0), func.count(Order.id)).where(SOLD_FILTER), start, end)
+    rev_stmt = _range(select(func.coalesce(func.sum(REVENUE_EXPR), 0), func.count(Order.id)).where(SOLD_FILTER), start, end)
     rev, n = (await db.execute(rev_stmt)).one()
     cost_stmt = _range(
         select(func.coalesce(func.sum(COST_EXPR * OrderItem.qty), 0), func.coalesce(func.sum(OrderItem.qty), 0))
