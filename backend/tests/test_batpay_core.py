@@ -117,8 +117,51 @@ def test_client_placeholder_when_empty(monkeypatch):
         monkeypatch.delenv(k, raising=False)
     c = bp.BatpayClient()
     assert not c.enabled and c.mode == "batpay_placeholder" and not c.webhook_ready
+    assert c.status == "placeholder" and c.public_config()["status"] == "placeholder"
     ins = c.placeholder_instructions(10000, "qris")
     assert ins["status"] == "awaiting_integration"
+
+
+def test_client_partial_when_private_key_missing(client, monkeypatch):
+    monkeypatch.delenv("BATPAY_PRIVATE_KEY", raising=False)
+    c = bp.BatpayClient()
+    assert not c.enabled and not c.credentials_complete and c.status == "partial"
+    cfg = c.public_config()
+    assert cfg["partial"] is True and cfg["missing"] == ["private_key"] and cfg["force_placeholder"] is False
+
+
+def test_force_placeholder_kill_switch_blocks_everything(client, monkeypatch):
+    """BATPAY_FORCE_PLACEHOLDER=true: kredensial lengkap tetapi TIDAK ADA panggilan keluar ke BATPay."""
+    import asyncio
+
+    monkeypatch.setenv("BATPAY_FORCE_PLACEHOLDER", "true")
+    c = bp.BatpayClient()
+    assert c.credentials_complete and not c.enabled and c.force_placeholder
+    assert c.mode == "batpay_placeholder" and c.status == "held"
+    cfg = c.public_config("https://toko.example")
+    assert cfg["enabled"] is False and cfg["force_placeholder"] is True and cfg["credentials_complete"] is True
+    assert cfg["partial"] is False and cfg["missing"] == []
+    # webhook internal token tetap bisa dipakai untuk uji manual; jalur SNAP dinonaktifkan selama ditahan
+    assert c.webhook_ready
+    ok, how = c.verify_webhook({"X-CALLBACK-TOKEN": "tok-internal"}, "{}", "jwt-secret")
+    assert ok and how == "token"
+    # test_connection tidak boleh menyentuh jaringan: patch httpx agar meledak bila dipanggil
+    import httpx
+
+    def _boom(*a, **k):  # pragma: no cover - harus tidak pernah terpanggil
+        raise AssertionError("HTTP request terkirim padahal integrasi ditahan!")
+
+    monkeypatch.setattr(httpx, "AsyncClient", _boom)
+    res = asyncio.run(c.test_connection())
+    assert res["ok"] is False and res["step"] == "config" and res.get("held") is True
+    with pytest.raises(bp.BatpayError):
+        asyncio.run(c.get_token())
+    ins = c.placeholder_instructions(10000, "qris")
+    assert ins["status"] == "awaiting_integration" and "aktivasi" in ins["message"]
+    # nilai selain true -> tidak ditahan
+    for v in ("false", "0", "", "off"):
+        monkeypatch.setenv("BATPAY_FORCE_PLACEHOLDER", v)
+        assert bp.BatpayClient().enabled, f"nilai {v!r} tidak boleh menahan integrasi"
 
 
 def test_outbound_headers_signature(client):

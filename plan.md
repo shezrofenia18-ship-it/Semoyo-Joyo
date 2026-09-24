@@ -139,3 +139,11 @@
   tombol Admin/Owner "Selesai / Terima Uang", "Ubah Metode Pembayaran" selama belum lunas, integrasi BATPay SNAP (QRIS & VA, biaya layanan
   gross-up BATPAY_FEE_PERCENT/BATPAY_FEE_FIXED + override per kanal, webhook /api/payments/batpay/webhook -> Lunas & Selesai), tab Owner
   "Bayar Online" di Pengaturan, seluruh sisa gateway lama dihapus. Env BATPAY_* kosong = mode placeholder. Detail di memory/PRD.md.
+
+- [x] Tahap 7 (Sep 2026, branch Integrasi-Batpay-Staging): Kill-switch `BATPAY_FORCE_PLACEHOLDER=true` (status "held"/Ditahan: tanpa panggilan
+  apa pun ke server BATPay walau kredensial lengkap), label notifikasi admin 3 metode (useAdminEvents.js), backend_test.py ditulis ulang (asersi dari
+  backend/.env + safety guard placeholder, tanpa nama gateway lama), .env.example/README/docker-compose diperbarui. Verifikasi mode placeholder:
+  unit test 21/21, backend_test.py 19/19, testing agent iteration_10 backend 40/40, UI diverifikasi manual (tab Bayar Online "Ditahan", Admin Pesanan,
+  checkout Bayar Online nonaktif).
+- [ ] MENUNGGU USER: whitelist API BATPay selesai -> isi BATPAY_PRIVATE_KEY, hapus BATPAY_FORCE_PLACEHOLDER, restart, uji koneksi & E2E nyata
+  (token B2B -> QRIS/VA -> webhook SNAP). JANGAN jalankan sebelum instruksi user.

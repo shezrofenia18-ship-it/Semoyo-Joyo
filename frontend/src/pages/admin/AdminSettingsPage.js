@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   Settings, UserCog, Store, Users, RefreshCw, ShieldCheck, KeyRound, Loader2, Save, Plus, Trash2, Search, CheckCircle2, AlertTriangle, Info,
-  Pencil, Wallet, HandCoins, Coins, TrendingUp, ReceiptText, Boxes, ShoppingBag, Sparkles, QrCode, Landmark, Copy, Globe, Webhook, Link2, Percent,
+  Pencil, Wallet, HandCoins, Coins, TrendingUp, ReceiptText, Boxes, ShoppingBag, Sparkles, QrCode, Landmark, Copy, Globe, Webhook, Link2, Percent, PauseCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { api, errorMessage } from "@/lib/api";
@@ -411,7 +411,8 @@ function PaymentGatewayTab() {
   }
 
   const active = cfg.enabled;
-  const partial = !active && cfg.partial;
+  const held = !active && cfg.force_placeholder; // kill-switch BATPAY_FORCE_PLACEHOLDER=true
+  const partial = !active && !held && cfg.partial;
   const missing = Object.entries(cfg.configured || {}).filter(([k, v]) => !v && k !== "webhook_token").map(([k]) => CRED_LABEL[k] || k);
   const envLabel = cfg.env === "production" ? "Production" : (cfg.base_url || "").includes("sg-openapi") ? "Staging" : "Sandbox";
   const qrisChannels = (cfg.channels || []).filter((c) => c.group === "qris");
@@ -420,25 +421,27 @@ function PaymentGatewayTab() {
   return (
     <div className="space-y-4" data-testid="batpay-tab">
       {/* Status */}
-      <Card className={cn("border", active ? "border-emerald-200 bg-emerald-50/60" : "border-amber-200 bg-amber-50/60")} data-testid="batpay-status-card">
+      <Card className={cn("border", active ? "border-emerald-200 bg-emerald-50/60" : held ? "border-sky-200 bg-sky-50/60" : "border-amber-200 bg-amber-50/60")} data-testid="batpay-status-card">
         <CardContent className="flex flex-col gap-4 p-5 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-start gap-3">
-            <div className={cn("grid h-11 w-11 shrink-0 place-items-center rounded-xl", active ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700")}>
-              {active ? <CheckCircle2 className="h-6 w-6" /> : <AlertTriangle className="h-6 w-6" />}
+            <div className={cn("grid h-11 w-11 shrink-0 place-items-center rounded-xl", active ? "bg-emerald-100 text-emerald-700" : held ? "bg-sky-100 text-sky-700" : "bg-amber-100 text-amber-700")}>
+              {active ? <CheckCircle2 className="h-6 w-6" /> : held ? <PauseCircle className="h-6 w-6" /> : <AlertTriangle className="h-6 w-6" />}
             </div>
             <div>
               <div className="flex flex-wrap items-center gap-2">
                 <h2 className="text-base font-semibold">BATPay - Bayar Online (QRIS & Virtual Account)</h2>
-                <Badge className={cn("rounded-md", active ? "bg-emerald-600 hover:bg-emerald-600" : "bg-amber-500 hover:bg-amber-500")} data-testid="batpay-mode-badge">
-                  {active ? `Aktif - ${envLabel}` : partial ? "Konfigurasi belum lengkap" : "Placeholder (belum aktif)"}
+                <Badge className={cn("rounded-md", active ? "bg-emerald-600 hover:bg-emerald-600" : held ? "bg-sky-600 hover:bg-sky-600" : "bg-amber-500 hover:bg-amber-500")} data-testid="batpay-mode-badge">
+                  {active ? `Aktif - ${envLabel}` : held ? `Ditahan - ${envLabel}` : partial ? "Konfigurasi belum lengkap" : "Placeholder (belum aktif)"}
                 </Badge>
               </div>
               <p className="mt-1 text-sm text-muted-foreground" data-testid="batpay-status-text">
                 {active
                   ? `Tagihan QRIS/VA dibuat nyata melalui ${cfg.base_url} (Merchant ${cfg.merchant_id}). Pembayaran yang masuk lewat webhook otomatis mengubah pesanan menjadi Lunas & Selesai.`
-                  : partial
-                    ? `Sebagian kredensial BATPay sudah terisi (${cfg.base_url}), tetapi variabel berikut masih kosong. Bayar Online tetap nonaktif di checkout sampai lengkap.`
-                    : "Kredensial BATPay belum diisi di environment backend. Opsi Bayar Online tampil nonaktif di checkout; pelanggan hanya dapat memakai Cash atau Bayar Nanti."}
+                  : held
+                    ? `Kredensial ${cfg.credentials_complete ? "sudah lengkap" : "belum lengkap"} untuk ${cfg.base_url}, tetapi integrasi DITAHAN oleh env BATPAY_FORCE_PLACEHOLDER=true: tidak ada panggilan ke server BATPay (checkout online, uji koneksi, cek status). Bayar Online tampil nonaktif di checkout. Hapus variabel tersebut lalu redeploy setelah whitelist API dari BATPay selesai.`
+                    : partial
+                      ? `Sebagian kredensial BATPay sudah terisi (${cfg.base_url}), tetapi variabel berikut masih kosong. Bayar Online tetap nonaktif di checkout sampai lengkap.`
+                      : "Kredensial BATPay belum diisi di environment backend. Opsi Bayar Online tampil nonaktif di checkout; pelanggan hanya dapat memakai Cash atau Bayar Nanti."}
               </p>
               {!active && missing.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-1.5" data-testid="batpay-missing-list">
@@ -449,7 +452,7 @@ function PaymentGatewayTab() {
           </div>
           <div className="flex shrink-0 flex-wrap gap-2">
             <Button variant="outline" onClick={load} className="gap-2" data-testid="batpay-refresh"><RefreshCw className="h-4 w-4" /> Muat Ulang</Button>
-            <Button onClick={testConnection} disabled={testing || !active} className="gap-2" title={active ? "Ambil token B2B dari BATPay" : "Lengkapi kredensial dulu"} data-testid="batpay-test-connection">
+            <Button onClick={testConnection} disabled={testing || !active} className="gap-2" title={active ? "Ambil token B2B dari BATPay" : held ? "Integrasi ditahan (BATPAY_FORCE_PLACEHOLDER=true)" : "Lengkapi kredensial dulu"} data-testid="batpay-test-connection">
               {testing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Globe className="h-4 w-4" />} Uji Koneksi
             </Button>
           </div>

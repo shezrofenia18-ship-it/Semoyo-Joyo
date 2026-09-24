@@ -15,6 +15,9 @@ Mode:
   - enabled  : BATPAY_PARTNER_ID, BATPAY_CLIENT_ID, BATPAY_SECRET_KEY, BATPAY_PRIVATE_KEY, BATPAY_MERCHANT_ID terisi -> tagihan dibuat nyata.
   - partial  : sebagian terisi (mis. private key belum ada) -> tetap placeholder, UI Owner menampilkan variabel yang kurang.
   - placeholder: kredensial kosong -> pesanan Bayar Online tetap dibuat (pending + biaya layanan), instruksi "menunggu aktivasi".
+  - ditahan  : BATPAY_FORCE_PLACEHOLDER=true -> kill-switch. Walau kredensial lengkap, SEMUA panggilan keluar ke server BATPay
+               dinonaktifkan (checkout online, uji koneksi, cek status, pembatalan tagihan). Dipakai selagi BATPay memproses
+               whitelist API partner. Hapus / set false untuk mengaktifkan integrasi nyata.
 
 Biaya layanan (gross-up) agar dana yang cair ke toko utuh:
   total_tagihan = ceil((dasar + biaya_tetap) / (1 - persen/100)); biaya_layanan = total_tagihan - dasar
@@ -111,6 +114,13 @@ def _env_float(name: str, default: float) -> float:
         return float(_env(name, str(default)) or default)
     except ValueError:
         return default
+
+
+def _env_bool(name: str, default: bool = False) -> bool:
+    v = _env(name).lower()
+    if not v:
+        return default
+    return v in ("1", "true", "yes", "on", "ya")
 
 
 def _load_pem(value: str) -> str:
@@ -237,6 +247,8 @@ class BatpayClient:
         self.channel_id = _env("BATPAY_CHANNEL_ID", "95221")
         self.public_key = _load_pem(_env("BATPAY_PUBLIC_KEY")) or BATPAY_PUBLIC_KEYS[self.env]
         self.webhook_token = _env("BATPAY_WEBHOOK_TOKEN")
+        # Kill-switch: paksa mode placeholder walau kredensial lengkap (tidak ada panggilan keluar ke BATPay).
+        self.force_placeholder = _env_bool("BATPAY_FORCE_PLACEHOLDER", False)
         self.expire_minutes = int(_env_float("BATPAY_EXPIRE_MINUTES", 60))
         # Biaya layanan: default global BATPAY_FEE_PERCENT (0,7%) & BATPAY_FEE_FIXED (Rp0),
         # bisa di-override per kanal lewat BATPAY_QRIS_FEE_* / BATPAY_VA_FEE_* (opsional, kosong = pakai global).
@@ -253,12 +265,31 @@ class BatpayClient:
 
     # ---------- konfigurasi ----------
     @property
-    def enabled(self) -> bool:
+    def credentials_complete(self) -> bool:
+        """Semua kredensial wajib terisi (terlepas dari kill-switch)."""
         return bool(self.client_id and self.partner_id and self.secret_key and self.private_key and self.merchant_id)
+
+    @property
+    def enabled(self) -> bool:
+        """Integrasi nyata aktif: kredensial lengkap DAN tidak ditahan oleh BATPAY_FORCE_PLACEHOLDER."""
+        return self.credentials_complete and not self.force_placeholder
 
     @property
     def mode(self) -> str:
         return f"batpay_{self.env}" if self.enabled else "batpay_placeholder"
+
+    @property
+    def status(self) -> str:
+        """active | held (ditahan kill-switch, apa pun kelengkapan kredensial) | partial | placeholder."""
+        if self.enabled:
+            return "active"
+        if self.force_placeholder:
+            return "held"
+        return "partial" if any(self._required_configured().values()) else "placeholder"
+
+    def _required_configured(self) -> dict[str, bool]:
+        return {"partner_id": bool(self.partner_id), "client_id": bool(self.client_id), "secret_key": bool(self.secret_key),
+                "private_key": bool(self.private_key), "merchant_id": bool(self.merchant_id)}
 
     @property
     def webhook_ready(self) -> bool:
@@ -288,12 +319,12 @@ class BatpayClient:
 
     def public_config(self, app_url: str = "") -> dict[str, Any]:
         base = (app_url or "").rstrip("/")
-        configured = {"partner_id": bool(self.partner_id), "client_id": bool(self.client_id), "secret_key": bool(self.secret_key),
-                      "private_key": bool(self.private_key), "merchant_id": bool(self.merchant_id), "webhook_token": bool(self.webhook_token)}
-        required = {k: v for k, v in configured.items() if k != "webhook_token"}
+        required = self._required_configured()
+        configured = {**required, "webhook_token": bool(self.webhook_token)}
         return {
-            "provider": PROVIDER, "mode": self.mode, "enabled": self.enabled, "env": self.env, "base_url": self.base_url,
-            "partial": (not self.enabled) and any(required.values()), "missing": [k for k, v in required.items() if not v],
+            "provider": PROVIDER, "mode": self.mode, "status": self.status, "enabled": self.enabled, "env": self.env, "base_url": self.base_url,
+            "credentials_complete": self.credentials_complete, "force_placeholder": self.force_placeholder,
+            "partial": (not self.credentials_complete) and any(required.values()), "missing": [k for k, v in required.items() if not v],
             "merchant_id": self.merchant_id, "partner_id_hint": (self.partner_id[:6] + "..." + self.partner_id[-4:]) if len(self.partner_id) > 12 else bool(self.partner_id),
             "webhook_ready": self.webhook_ready, "webhook_url": f"{base}{WEBHOOK_PATH}", "token_url": f"{base}{INBOUND_TOKEN_PATH}",
             "channels": self.channels(), "expire_minutes": self.expire_minutes,
@@ -303,7 +334,13 @@ class BatpayClient:
         }
 
     async def test_connection(self) -> dict[str, Any]:
-        """Uji koneksi ke BATPay: ambil token B2B baru. Tidak pernah mengembalikan rahasia."""
+        """Uji koneksi ke BATPay: ambil token B2B baru. Tidak pernah mengembalikan rahasia.
+
+        Saat kill-switch aktif (BATPAY_FORCE_PLACEHOLDER=true) TIDAK ADA permintaan jaringan yang dikirim.
+        """
+        if self.force_placeholder:
+            return {"ok": False, "step": "config", "held": True, "base_url": self.base_url, "missing": self.public_config()["missing"],
+                    "message": "Integrasi ditahan (BATPAY_FORCE_PLACEHOLDER=true) - panggilan ke server BATPay dinonaktifkan. Hapus variabel ini setelah whitelist API dari BATPay selesai."}
         if not self.enabled:
             return {"ok": False, "step": "config", "message": "Kredensial belum lengkap", "missing": self.public_config()["missing"]}
         t0 = time.perf_counter()
@@ -320,9 +357,13 @@ class BatpayClient:
 
     def placeholder_instructions(self, amount: int, channel: str) -> dict[str, Any]:
         ch = next((c for c in self.channels() if c["key"] == channel), None) or {"name": "QRIS"}
+        if self.force_placeholder:
+            msg = "Pembayaran online BATPay sedang dalam proses aktivasi. Silakan pilih Cash atau Bayar Nanti, atau hubungi kasir."
+        else:
+            msg = "Pembayaran online BATPay belum aktif (kredensial belum dikonfigurasi). Silakan pilih Cash atau Bayar Nanti, atau hubungi kasir."
         return {
             "type": "online", "provider": PROVIDER, "channel": channel, "channel_name": ch["name"], "status": "awaiting_integration", "amount": amount,
-            "message": "Pembayaran online BATPay belum aktif (kredensial belum dikonfigurasi). Silakan pilih Cash atau Bayar Nanti, atau hubungi kasir.",
+            "message": msg,
         }
 
     # ---------- signature outbound ----------

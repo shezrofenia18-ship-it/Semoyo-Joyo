@@ -109,3 +109,14 @@ Brand: Biru #0B4EA2 (primary), Kuning #F5C400 (aksen), Putih. Logo: frontend/pub
   Kolom orders.service_fee (pass-through, tidak masuk pendapatan toko di finance.py).
 - Owner: Pengaturan -> tab "Bayar Online" (GET /api/admin/settings/payments): status aktif/placeholder, fee, kanal, URL webhook/token untuk dashboard BATPay.
 - Sisa referensi gateway lama dihapus dari kode, konfigurasi, tes, dan dokumentasi. Tes: backend/tests/test_batpay_core.py, test_payments_refactor.py.
+
+## Tahap 7 (Sep 2026, branch Integrasi-Batpay-Staging): Kill-switch & Pembersihan Akhir - SELESAI (mode placeholder)
+- `BATPAY_FORCE_PLACEHOLDER=true` (backend/payments/batpay.py): `enabled = credentials_complete and not force_placeholder`. Saat aktif: mode
+  `batpay_placeholder`, `status="held"`, checkout online -> instruksi placeholder ("sedang dalam proses aktivasi"), `test_connection` mengembalikan
+  `{ok:false, step:"config", held:true}` tanpa request jaringan, inbound token 503, cek status/cancel tidak dipanggil. Webhook token internal tetap jalan.
+  `public_config` kini memuat `status` (active|held|partial|placeholder), `credentials_complete`, `force_placeholder`.
+- UI Owner Pengaturan -> Bayar Online: badge biru "Ditahan - Staging/Sandbox/Production", teks menjelaskan kill-switch, daftar variabel kosong, tombol Uji Koneksi nonaktif.
+- useAdminEvents.js: METHOD_LABEL {cash: "Cash (Tunai) - Proses", piutang: "Bayar Nanti (Piutang)", online: "Bayar Online (BATPay) - menunggu"}; toast lunas menyebut metode.
+- backend_test.py ditulis ulang: ekspektasi dihitung dari backend/.env, safety guard menolak berjalan bila payment_mode bukan placeholder, endpoint legacy generik.
+- Dokumen: .env.example (nama env PARTNER_ID/CLIENT_ID/SECRET_KEY + FORCE_PLACEHOLDER), README-DEPLOY (bagian kill-switch), docker-compose.
+- Status workspace: BATPAY_PRIVATE_KEY masih kosong di /app/backend/.env; FORCE_PLACEHOLDER=true. E2E nyata ke BATPay staging BELUM dijalankan (menunggu whitelist API + instruksi user).

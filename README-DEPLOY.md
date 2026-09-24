@@ -47,6 +47,11 @@ Admin dapat mengubah metode pembayaran pesanan yang belum lunas lewat **"Ubah Me
    - Webhook / Payment Notification (QRIS `qr-mpm-notify` & VA `transfer-va/payment`): `https://APP_URL/api/payments/batpay/webhook`
 4. Cek `GET /api/health` -> `payment_mode` = `batpay_sandbox` / `batpay_production`.
 
+**Menahan integrasi sementara (kill-switch).** Bila kredensial sudah lengkap tetapi BATPay masih memproses whitelist API partner, set
+`BATPAY_FORCE_PLACEHOLDER=true`. Backend tetap dalam mode placeholder (`payment_mode=batpay_placeholder`): checkout Bayar Online,
+Uji Koneksi, cek status, dan pembatalan tagihan **tidak** mengirim permintaan apa pun ke server BATPay. Tab **Pengaturan -> Bayar Online**
+menampilkan status **Ditahan**. Hapus variabel ini (atau set `false`) lalu redeploy untuk mengaktifkan integrasi nyata.
+
 Referensi protokol SNAP yang dipakai (`backend/payments/batpay.py`): token B2B `POST /api/v1.0/access-token/b2b` (signature SHA256withRSA `clientKey|timestamp`),
 transaksi dengan `X-SIGNATURE` HMAC_SHA512 atas `METHOD:PATH:token:sha256(body):timestamp`, QRIS `qr-mpm-generate/query/cancel`, VA `transfer-va/create-va/status/delete-va`.
 Webhook memverifikasi Bearer token yang kita terbitkan + `X-SIGNATURE`; untuk uji manual gunakan `BATPAY_WEBHOOK_TOKEN` (header `X-CALLBACK-TOKEN`).
