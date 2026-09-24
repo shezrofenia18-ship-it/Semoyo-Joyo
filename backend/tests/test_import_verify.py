@@ -5,7 +5,7 @@ import uuid
 import pytest
 import requests
 
-BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://tarik-preview.preview.emergentagent.com").rstrip("/")
+BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://batpay-e2e-testing.preview.emergentagent.com").rstrip("/")
 
 
 @pytest.fixture(scope="module")

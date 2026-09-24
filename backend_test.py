@@ -9,7 +9,7 @@ from datetime import datetime
 
 import requests
 
-BASE_URL = "https://semoyo-test.preview.emergentagent.com"
+BASE_URL = "https://batpay-e2e-testing.preview.emergentagent.com"
 WEBHOOK_TOKEN = "dev-webhook-token-semoyo"
 
 class Colors:
