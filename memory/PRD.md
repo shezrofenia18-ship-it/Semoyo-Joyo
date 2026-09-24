@@ -119,4 +119,5 @@ Brand: Biru #0B4EA2 (primary), Kuning #F5C400 (aksen), Putih. Logo: frontend/pub
 - useAdminEvents.js: METHOD_LABEL {cash: "Cash (Tunai) - Proses", piutang: "Bayar Nanti (Piutang)", online: "Bayar Online (BATPay) - menunggu"}; toast lunas menyebut metode.
 - backend_test.py ditulis ulang: ekspektasi dihitung dari backend/.env, safety guard menolak berjalan bila payment_mode bukan placeholder, endpoint legacy generik.
 - Dokumen: .env.example (nama env PARTNER_ID/CLIENT_ID/SECRET_KEY + FORCE_PLACEHOLDER), README-DEPLOY (bagian kill-switch), docker-compose.
-- Status workspace: BATPAY_PRIVATE_KEY masih kosong di /app/backend/.env; FORCE_PLACEHOLDER=true. E2E nyata ke BATPay staging BELUM dijalankan (menunggu whitelist API + instruksi user).
+- Status workspace (update): BATPAY_PRIVATE_KEY terisi (RSA-2048 valid), BATPAY_FORCE_PLACEHOLDER=false -> mode `batpay_sandbox` AKTIF ke https://sg-openapi.batbiz.id. Uji Koneksi / E2E nyata BELUM dijalankan (menunggu instruksi user).
+- Git: staging & main tersinkron (main 0927046 = tree staging 515242a); travoy.py & file platform sisa konflik dihapus dari main.
