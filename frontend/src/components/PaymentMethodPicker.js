@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Banknote, HandCoins, CreditCard, QrCode, Landmark, Clock, Info } from "lucide-react";
 import { api } from "@/lib/api";
 import { Label } from "@/components/ui/label";
@@ -41,7 +41,10 @@ export function useFeePreview(amount, enabled = true) {
 export function PaymentMethodPicker({ method, onMethodChange, channel, onChannelChange, amount = 0, config, compact = false, idPrefix = "pm", disabled = false }) {
   const onlineEnabled = !!config?.online_enabled;
   const fee = useFeePreview(amount, method === "online");
-  const channels = fee?.channels || config?.methods?.find((m) => m.key === "online")?.channels || [];
+  const channels = useMemo(
+    () => fee?.channels || config?.methods?.find((m) => m.key === "online")?.channels || [],
+    [fee, config],
+  );
 
   useEffect(() => {
     if (method === "online" && channels.length && !channels.some((c) => c.key === channel)) onChannelChange?.(channels[0].key);
