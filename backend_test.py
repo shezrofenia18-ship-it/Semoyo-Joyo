@@ -56,7 +56,11 @@ def expected_config() -> dict:
         "configured": configured, "complete": complete, "force": force, "enabled": enabled, "status": status,
         "partial": (not complete) and any(configured.values()), "missing": [k for k, v in configured.items() if not v],
         "base_url": (_env("BATPAY_BASE_URL") or default_base).rstrip("/"), "merchant_id": _env("BATPAY_MERCHANT_ID"),
-        "fee_percent": float(_env("BATPAY_FEE_PERCENT") or 0.7), "fee_fixed": float(_env("BATPAY_FEE_FIXED") or 0),
+        # kebijakan biaya (default tertanam di kode, env hanya override)
+        "qris_threshold": int(float(_env("BATPAY_QRIS_FEE_THRESHOLD") or 500000)),
+        "qris_percent": float(_env("BATPAY_QRIS_FEE_PERCENT") or 0.3),
+        "va_default": int(float(_env("BATPAY_VA_FLAT_FEE_DEFAULT") or 2000)),
+        "va_by_bank": {**{"bca": 4000, "bsi": 2500}, **{k.strip().lower(): int(float(v)) for k, v in (kv.split("=", 1) for kv in _env("BATPAY_VA_FLAT_FEES").split(",") if "=" in kv)}},
     }
 
 
@@ -182,8 +186,11 @@ class APITester:
                 ("missing", d.get("missing"), e["missing"]),
                 ("base_url", d.get("base_url"), e["base_url"]),
                 ("merchant_id", d.get("merchant_id"), e["merchant_id"]),
-                ("fees.default.percent", (d.get("fees") or {}).get("default", {}).get("percent"), e["fee_percent"]),
-                ("fees.default.fixed", (d.get("fees") or {}).get("default", {}).get("fixed"), e["fee_fixed"]),
+                ("fee_policy.qris.threshold", (d.get("fee_policy") or {}).get("qris", {}).get("threshold"), e["qris_threshold"]),
+                ("fee_policy.qris.percent_above", (d.get("fee_policy") or {}).get("qris", {}).get("percent_above"), e["qris_percent"]),
+                ("fee_policy.va.default", (d.get("fee_policy") or {}).get("va", {}).get("default"), e["va_default"]),
+                ("fee_policy.va.by_bank.bca", (d.get("fee_policy") or {}).get("va", {}).get("by_bank", {}).get("bca"), e["va_by_bank"]["bca"]),
+                ("fee_policy.va.by_bank.bsi", (d.get("fee_policy") or {}).get("va", {}).get("by_bank", {}).get("bsi"), e["va_by_bank"]["bsi"]),
             ]
             for label, got, want in checks:
                 if got != want:
@@ -197,6 +204,10 @@ class APITester:
             keys = [c.get("key") for c in d.get("channels", [])]
             if "qris" not in keys or not any(k.startswith("va_") for k in keys):
                 return self.log("FAIL", "settings/payments - channels", f"Got {keys}", d)
+            if not _env("BATPAY_VA_BANKS"):
+                want_banks = {f"va_{b}" for b in ("bca", "mandiri", "bri", "bni", "bsi", "cimb", "danamon", "permata", "btn", "bjb", "neo")}
+                if not want_banks.issubset(keys):
+                    return self.log("FAIL", "settings/payments - 11 bank VA", f"Kurang: {sorted(want_banks - set(keys))}", keys)
             # Rahasia tidak boleh bocor
             text = r.text
             for secret_env in ("BATPAY_SECRET_KEY", "BATPAY_PRIVATE_KEY"):
@@ -286,27 +297,54 @@ class APITester:
             if d.get("online_enabled") != self.exp["enabled"]:
                 return self.log("FAIL", f"{name} - online_enabled", f"Expected {self.exp['enabled']}, got {d.get('online_enabled')}")
             ch = [c.get("key") for c in online.get("channels", [])]
-            if "qris" not in ch or not all(v in ch for v in ("va_bca", "va_mandiri", "va_cimb", "va_danamon")):
+            need = ("va_bca", "va_mandiri", "va_cimb", "va_danamon") if _env("BATPAY_VA_BANKS") else ("va_bca", "va_mandiri", "va_bri", "va_bni", "va_bsi", "va_cimb", "va_danamon", "va_permata", "va_btn", "va_bjb", "va_neo")
+            if "qris" not in ch or not all(v in ch for v in need):
                 return self.log("FAIL", f"{name} - channels", f"Got {ch}")
-            self.log("PASS", name, f"3 metode, online.available={online.get('available')}, channels={ch}")
+            if not isinstance(d.get("fee_policy"), dict):
+                return self.log("FAIL", f"{name} - fee_policy", "fee_policy tidak ada")
+            self.log("PASS", name, f"3 metode, online.available={online.get('available')}, {len(ch)} kanal (QRIS + {len(ch)-1} VA)")
         except Exception as e:  # noqa: BLE001
             self.log("FAIL", name, f"Exception: {e}")
 
     def test_fee_preview(self):
-        name = "GET /api/payments/fee?amount=100000&channel=qris"
+        """QRIS bertingkat (<= ambang gratis, di atasnya persen gross-up) & VA flat per bank."""
+        name = "GET /api/payments/fee - QRIS bertingkat & VA flat"
+        e = self.exp
+        thr, pct = e["qris_threshold"], e["qris_percent"]
+        import math
+
+        def gross_up(base):
+            return max(0, int(math.ceil(base / (1 - pct / 100) - 1e-9)) - base)
+
+        cases = [
+            (min(100_000, thr), "qris", 0),
+            (thr, "qris", 0),
+            (thr + 1, "qris", gross_up(thr + 1)),
+            (600_000 if 600_000 > thr else thr * 2, "qris", gross_up(600_000 if 600_000 > thr else thr * 2)),
+            (300_000, "va_bca", e["va_by_bank"]["bca"]),
+            (300_000, "va_bsi", e["va_by_bank"]["bsi"]),
+            (300_000, "va_mandiri", e["va_by_bank"].get("mandiri", e["va_default"])),
+            (5_000_000, "va_bri", e["va_by_bank"].get("bri", e["va_default"])),  # flat: tidak tergantung nominal
+        ]
         try:
-            r = requests.get(f"{self.base_url}/api/payments/fee", params={"amount": 100000, "channel": "qris"}, timeout=15)
-            if r.status_code != 200:
-                return self.log("FAIL", name, f"Status {r.status_code}", r.text[:200])
-            d = r.json()
-            import math
-            pct, fixed = self.exp["fee_percent"], self.exp["fee_fixed"]
-            want = max(0, int(math.ceil((100000 + fixed) / (1 - pct / 100) - 1e-9)) - 100000)
-            if d.get("service_fee") != want or d.get("total") != 100000 + want:
-                return self.log("FAIL", name, f"Expected fee {want}, got {d.get('service_fee')} (total {d.get('total')})", d)
-            self.log("PASS", name, f"service_fee={want} (gross-up {pct}% + Rp{fixed:g})")
-        except Exception as e:  # noqa: BLE001
-            self.log("FAIL", name, f"Exception: {e}")
+            for amount, ch, want in cases:
+                r = requests.get(f"{self.base_url}/api/payments/fee", params={"amount": amount, "channel": ch}, timeout=15)
+                if r.status_code != 200:
+                    return self.log("FAIL", name, f"{ch} {amount}: status {r.status_code}", r.text[:200])
+                d = r.json()
+                if d.get("channel") != ch or d.get("service_fee") != want or d.get("total") != amount + want:
+                    return self.log("FAIL", name, f"{ch} {amount}: expected fee {want}, got {d.get('service_fee')} (channel={d.get('channel')}, total={d.get('total')})", d)
+                if ch == "qris" and want > 0:
+                    total = amount + want
+                    if total - total * pct / 100 < amount - 1e-6:
+                        return self.log("FAIL", name, f"gross-up salah: toko menerima < {amount}", d)
+            # kanal tak dikenal -> jatuh ke qris (pratinjau), bukan error
+            r = requests.get(f"{self.base_url}/api/payments/fee", params={"amount": 100000, "channel": "va_bankpalsu"}, timeout=15)
+            if r.status_code != 200 or r.json().get("channel") != "qris":
+                return self.log("FAIL", name, f"kanal tak dikenal harus fallback qris, got {r.status_code} {r.text[:120]}")
+            self.log("PASS", name, f"QRIS <= {thr:,} gratis, > ambang {pct}% gross-up; VA BCA {e['va_by_bank']['bca']}, BSI {e['va_by_bank']['bsi']}, lain {e['va_default']}")
+        except Exception as ex:  # noqa: BLE001
+            self.log("FAIL", name, f"Exception: {ex}")
 
     # ----- alur checkout
     def test_cash_flow(self, product):
@@ -355,8 +393,8 @@ class APITester:
             self.log("FAIL", name, f"Exception: {e}")
 
     def test_online_flow(self, product):
-        """Bayar Online dalam mode placeholder: pending + biaya layanan + instructions.status='awaiting_integration'."""
-        name = "Bayar Online (placeholder): checkout qris -> pending, service_fee>0, awaiting_integration"
+        """Bayar Online dalam mode placeholder: fee QRIS sesuai kebijakan bertingkat, VA flat per bank (termasuk bank baru), kanal tak valid 422."""
+        name = "Bayar Online (placeholder): checkout qris/VA -> pending, fee sesuai kebijakan, awaiting_integration"
         try:
             r = requests.post(f"{self.base_url}/api/checkout", json=self._payload(product, "online", "qris", tag="TEST_ONLINE"), timeout=15)
             if r.status_code != 200:
@@ -365,24 +403,37 @@ class APITester:
             o, pay = data.get("order", {}), data.get("payment", {})
             if o.get("payment_status") != "pending":
                 return self.log("FAIL", name, f"Expected 'pending', got {o.get('payment_status')}")
-            if float(o.get("service_fee") or 0) <= 0:
-                return self.log("FAIL", name, f"service_fee harus > 0, got {o.get('service_fee')}")
+            base = float(o.get("subtotal") or 0) + float(o.get("shipping_fee") or 0)
+            want = requests.get(f"{self.base_url}/api/payments/fee", params={"amount": int(base), "channel": "qris"}, timeout=15).json()["service_fee"]
+            if float(o.get("service_fee") or 0) != want:
+                return self.log("FAIL", name, f"service_fee qris expected {want} (dasar {base:g}), got {o.get('service_fee')}")
             ins = pay.get("instructions", {})
-            if ins.get("status") != "awaiting_integration" or ins.get("provider") != "batpay":
+            if ins.get("status") != "awaiting_integration" or ins.get("provider") != "batpay" or "fee_label" not in ins:
                 return self.log("FAIL", name, f"instructions salah: {ins}")
-            # VA channel juga tercatat
-            r2 = requests.post(f"{self.base_url}/api/checkout", json=self._payload(product, "online", "va_bca", tag="TEST_ONLINE_VA"), timeout=15)
-            o2 = r2.json().get("order", {}) if r2.status_code == 200 else {}
-            if o2.get("payment_channel") != "va_bca":
-                return self.log("FAIL", name, f"payment_channel VA salah: {o2.get('payment_channel')}")
-            self.log("PASS", name, f"{o['order_number']} pending, fee={o.get('service_fee')}, total={o.get('total')}; VA channel ok")
+            # VA lama & baru: flat per bank, tidak tergantung nominal
+            for ch, bank_fee in (("va_bca", self.exp["va_by_bank"]["bca"]), ("va_bsi", self.exp["va_by_bank"]["bsi"]),
+                                 ("va_bri", self.exp["va_by_bank"].get("bri", self.exp["va_default"])), ("va_neo", self.exp["va_by_bank"].get("neo", self.exp["va_default"]))):
+                r2 = requests.post(f"{self.base_url}/api/checkout", json=self._payload(product, "online", ch, tag="TEST_ONLINE_VA"), timeout=15)
+                o2 = r2.json().get("order", {}) if r2.status_code == 200 else {}
+                if r2.status_code != 200 or o2.get("payment_channel") != ch or float(o2.get("service_fee") or -1) != bank_fee:
+                    return self.log("FAIL", name, f"{ch}: status {r2.status_code}, channel={o2.get('payment_channel')}, fee={o2.get('service_fee')} (want {bank_fee})", r2.text[:200])
+            # kanal tidak valid -> 422 (validator), bukan diam-diam jatuh ke QRIS
+            for bad in ("va_bankpalsu", "gopay", "VA-BCA"):
+                r3 = requests.post(f"{self.base_url}/api/checkout", json=self._payload(product, "online", bad, tag="TEST_ONLINE_BAD"), timeout=15)
+                if r3.status_code != 422:
+                    return self.log("FAIL", name, f"kanal '{bad}' harus 422, got {r3.status_code}", r3.text[:200])
+            # huruf besar dinormalisasi
+            r4 = requests.post(f"{self.base_url}/api/checkout", json=self._payload(product, "online", "VA_BNI", tag="TEST_ONLINE_UP"), timeout=15)
+            if r4.status_code != 200 or r4.json().get("order", {}).get("payment_channel") != "va_bni":
+                return self.log("FAIL", name, f"'VA_BNI' harus dinormalisasi ke va_bni, got {r4.status_code} {r4.text[:120]}")
+            self.log("PASS", name, f"{o['order_number']} pending, fee qris={o.get('service_fee')} (dasar {base:g}); VA bca/bsi/bri/neo flat ok; kanal tak valid 422")
             return o
         except Exception as e:  # noqa: BLE001
             self.log("FAIL", name, f"Exception: {e}")
             return None
 
     def test_change_method(self, product):
-        name = "Admin ubah metode: cash -> piutang -> online(qris) -> cash (fee ditambah/dihapus)"
+        name = "Admin ubah metode: cash -> piutang -> online(va_bca) -> cash (fee flat ditambah/dihapus)"
         if not self.admin_token:
             return self.log("FAIL", name, "No admin token")
         try:
@@ -393,9 +444,10 @@ class APITester:
             r1 = requests.patch(f"{self.base_url}/api/admin/orders/{o['id']}/payment-method", json={"payment_method": "piutang"}, headers=h, timeout=15)
             if r1.status_code != 200 or r1.json().get("payment_status") != "piutang":
                 return self.log("FAIL", name, f"-> piutang gagal: {r1.status_code} {r1.text[:150]}")
-            r2 = requests.patch(f"{self.base_url}/api/admin/orders/{o['id']}/payment-method", json={"payment_method": "online", "payment_channel": "qris"}, headers=h, timeout=15)
+            r2 = requests.patch(f"{self.base_url}/api/admin/orders/{o['id']}/payment-method", json={"payment_method": "online", "payment_channel": "va_bca"}, headers=h, timeout=15)
             d2 = r2.json() if r2.status_code == 200 else {}
-            if d2.get("payment_status") != "pending" or float(d2.get("service_fee") or 0) <= 0 or float(d2.get("total")) <= base_total:
+            want_fee = self.exp["va_by_bank"]["bca"]
+            if d2.get("payment_status") != "pending" or float(d2.get("service_fee") or 0) != want_fee or float(d2.get("total")) != base_total + want_fee:
                 return self.log("FAIL", name, f"-> online gagal: {r2.status_code} {r2.text[:150]}")
             r3 = requests.patch(f"{self.base_url}/api/admin/orders/{o['id']}/payment-method", json={"payment_method": "cash"}, headers=h, timeout=15)
             d3 = r3.json() if r3.status_code == 200 else {}

@@ -18,6 +18,19 @@ from payments import batpay as bp  # noqa: E402
 PRIV, PUB = bp.generate_rsa_keypair()
 
 
+ENV_KEYS = ("BATPAY_CLIENT_ID", "BATPAY_PARTNER_ID", "BATPAY_SECRET_KEY", "BATPAY_CLIENT_KEY", "BATPAY_CLIENT_SECRET", "BATPAY_PRIVATE_KEY",
+            "BATPAY_MERCHANT_ID", "BATPAY_WEBHOOK_TOKEN", "BATPAY_PUBLIC_KEY", "BATPAY_FORCE_PLACEHOLDER", "BATPAY_ENV", "BATPAY_BASE_URL",
+            "BATPAY_VA_BANKS", "BATPAY_VA_PAYMENT_TYPES", "BATPAY_QRIS_FEE_THRESHOLD", "BATPAY_QRIS_FEE_PERCENT", "BATPAY_VA_FLAT_FEES",
+            "BATPAY_VA_FLAT_FEE_DEFAULT")
+
+
+@pytest.fixture(autouse=True)
+def _clean_env(monkeypatch):
+    """Isolasi: buang env BATPay yang mungkin bocor dari .env / suite lain agar unit test deterministik."""
+    for k in ENV_KEYS:
+        monkeypatch.delenv(k, raising=False)
+
+
 @pytest.fixture()
 def client(monkeypatch):
     monkeypatch.setenv("BATPAY_CLIENT_ID", "client-key-123")
@@ -65,7 +78,7 @@ def test_money_format_two_decimals():
 
 
 # ---------------- biaya layanan ----------------
-@pytest.mark.parametrize("base,pct,fixed", [(100000, 0.7, 0), (312500, 0.7, 0), (10000, 0, 4000), (250000, 1.5, 2500), (999, 0.7, 0)])
+@pytest.mark.parametrize("base,pct,fixed", [(100000, 0.7, 0), (312500, 0.7, 0), (10000, 0, 4000), (250000, 1.5, 2500), (999, 0.7, 0), (600000, 0.3, 0)])
 def test_gross_up_fee_leaves_store_amount_intact(base, pct, fixed):
     fee = bp.gross_up_fee(base, pct, fixed)
     total = base + fee
@@ -82,26 +95,94 @@ def test_fee_zero_for_zero_amount():
     assert bp.gross_up_fee(0, 0.7, 0) == 0
 
 
+@pytest.mark.parametrize("base,expected", [
+    (0, 0), (1, 0), (100_000, 0), (499_999, 0), (500_000, 0),          # <= 500.000 -> gratis
+    (500_001, 1505),  # 500001/0.997 = 501505.5 -> ceil 501506 -> fee 1505
+    (600_000, 1806),  # 600000/0.997 = 601805.4 -> ceil 601806 -> fee 1806
+    (1_000_000, 0),   # diverifikasi lewat invarian gross-up (expected=0 -> lewati cek angka)
+])
+def test_qris_tiered_fee_policy(monkeypatch, base, expected):
+    for k in ("BATPAY_QRIS_FEE_THRESHOLD", "BATPAY_QRIS_FEE_PERCENT"):
+        monkeypatch.delenv(k, raising=False)
+    fp = bp.FeePolicy()
+    assert fp.qris_threshold == 500_000 and fp.qris_percent == 0.3
+    fee = fp.qris_fee(base)
+    if base <= 500_000:
+        assert fee == 0
+    else:
+        # gross-up: dana toko utuh setelah potongan 0,3% dari total, dan tidak berlebihan
+        total = base + fee
+        assert total - total * 0.003 >= base - 1e-6
+        assert (total - 1) - (total - 1) * 0.003 < base
+        assert fee == bp.gross_up_fee(base, 0.3, 0)
+        if expected:
+            assert fee == expected
+
+
+def test_va_flat_fee_policy(monkeypatch):
+    for k in ("BATPAY_VA_FLAT_FEES", "BATPAY_VA_FLAT_FEE_DEFAULT"):
+        monkeypatch.delenv(k, raising=False)
+    fp = bp.FeePolicy()
+    assert fp.va_fee("bca") == 4000
+    assert fp.va_fee("bsi") == 2500
+    for b in ("mandiri", "bri", "bni", "cimb", "danamon", "permata", "btn", "bjb", "neo"):
+        assert fp.va_fee(b) == 2000, b
+    assert fp.va_fee("bank-tak-dikenal") == 2000  # fallback default
+    assert fp.va_fee("bca", 0) == 0  # nominal 0 -> tidak ada biaya
+    # tarif flat tidak tergantung nominal
+    assert fp.fee(10_000, "va_bca") == fp.fee(10_000_000, "va_bca") == 4000
+    assert fp.fee(750_000, "va_bsi") == 2500 and fp.fee(750_000, "va_bri") == 2000
+    d = fp.describe()
+    assert d["qris"]["type"] == "tiered_percent" and d["va"]["type"] == "flat"
+    assert d["va"]["by_bank"]["bca"] == 4000 and d["va"]["by_bank"]["neo"] == 2000
+    assert "500.000" in d["qris"]["label"] and "0,3" in d["qris"]["label"].replace(".", ",")
+
+
+def test_fee_policy_env_override(monkeypatch):
+    monkeypatch.setenv("BATPAY_QRIS_FEE_THRESHOLD", "1000000")
+    monkeypatch.setenv("BATPAY_QRIS_FEE_PERCENT", "0.5")
+    monkeypatch.setenv("BATPAY_VA_FLAT_FEES", "bca=5000, bri=3000, rusak=abc, =1")
+    monkeypatch.setenv("BATPAY_VA_FLAT_FEE_DEFAULT", "1500")
+    fp = bp.FeePolicy()
+    assert fp.qris_fee(900_000) == 0 and fp.qris_fee(1_000_001) == bp.gross_up_fee(1_000_001, 0.5, 0)
+    assert fp.va_fee("bca") == 5000 and fp.va_fee("bri") == 3000 and fp.va_fee("bsi") == 2500 and fp.va_fee("mandiri") == 1500
+
+
 def test_client_channel_fees(client, monkeypatch):
-    # default global: BATPAY_FEE_PERCENT=0.7, BATPAY_FEE_FIXED=0 berlaku untuk QRIS & VA
-    fee_qris = client.service_fee(100000, "qris")
-    fee_va = client.service_fee(100000, "va_bca")
-    assert fee_qris == 705  # 100000/(1-0.007) = 100704.7 -> 100705
-    assert fee_va == 705
+    # QRIS bertingkat & VA flat lewat client
+    assert client.service_fee(100_000, "qris") == 0
+    assert client.service_fee(500_000, "qris") == 0
+    assert client.service_fee(600_000, "qris") == 1806
+    assert client.service_fee(100_000, "va_bca") == 4000
+    assert client.service_fee(100_000, "va_bsi") == 2500
+    assert client.service_fee(100_000, "va_mandiri") == 2000
+    assert client.service_fee(100_000, "VA_BRI") == 2000
     assert client.normalize_channel("VA_BCA") == "va_bca"
     assert client.normalize_channel("apa-ini") == "qris"
+    assert client.is_valid_channel("va_neo") and not client.is_valid_channel("va_xyz")
     keys = [c["key"] for c in client.channels()]
-    assert keys[0] == "qris" and "va_bca" in keys and "va_mandiri" in keys
-    # override global + per kanal
-    monkeypatch.setenv("BATPAY_FEE_PERCENT", "1")
-    monkeypatch.setenv("BATPAY_FEE_FIXED", "500")
-    monkeypatch.setenv("BATPAY_VA_FEE_PERCENT", "0")
-    monkeypatch.setenv("BATPAY_VA_FEE_FIXED", "4000")
-    c2 = bp.BatpayClient()
-    assert c2.fees["qris"] == {"percent": 1.0, "fixed": 500.0}
-    assert c2.fees["va"] == {"percent": 0.0, "fixed": 4000.0}
-    assert c2.service_fee(100000, "va_mandiri") == 4000
-    assert c2.public_config()["fees"]["default"] == {"percent": 1.0, "fixed": 500.0}
+    assert keys[0] == "qris"
+    for b in ("bca", "mandiri", "bri", "bni", "bsi", "cimb", "danamon", "permata", "btn", "bjb", "neo"):
+        assert f"va_{b}" in keys, b
+    by = {c["key"]: c for c in client.channels()}
+    assert by["qris"]["fee_type"] == "tiered_percent" and by["qris"]["fee_threshold"] == 500_000
+    assert by["va_bca"]["fee_type"] == "flat" and by["va_bca"]["fee_fixed"] == 4000 and by["va_bca"]["payment_type"] == "BCA_DYNAMIC"
+    assert by["va_neo"]["payment_type"] == "NEO_DYNAMIC" and "2.000" in by["va_neo"]["fee_label"]
+    cfg = client.public_config()
+    assert cfg["fee_policy"]["va"]["by_bank"]["bsi"] == 2500 and "fees" not in cfg
+    assert len(cfg["va_banks"]) == 11
+
+
+def test_va_banks_subset_and_payment_type_override(client, monkeypatch):
+    monkeypatch.setenv("BATPAY_VA_BANKS", "BCA, BRI, NEO, BANKPALSU")
+    monkeypatch.setenv("BATPAY_VA_PAYMENT_TYPES", "neo=NEOBANK_DYNAMIC, bri=bri_dynamic_v2, palsu=X")
+    c = bp.BatpayClient()
+    assert c.va_banks == ["bca", "bri", "neo"]
+    keys = [ch["key"] for ch in c.channels()]
+    assert keys == ["qris", "va_bca", "va_bri", "va_neo"]
+    assert c.va_payment_types["neo"] == "NEOBANK_DYNAMIC" and c.va_payment_types["bri"] == "BRI_DYNAMIC_V2" and c.va_payment_types["bca"] == "BCA_DYNAMIC"
+    # bank yang tidak diaktifkan -> tidak valid & jatuh ke qris saat normalisasi
+    assert not c.is_valid_channel("va_mandiri") and c.normalize_channel("va_mandiri") == "qris"
 
 
 # ---------------- konfigurasi ----------------
@@ -112,10 +193,8 @@ def test_client_enabled_and_pem_from_escaped_env(client):
     assert client.base_url == bp.SANDBOX_BASE_URL
 
 
-def test_client_placeholder_when_empty(monkeypatch):
-    for k in ("BATPAY_CLIENT_ID", "BATPAY_PARTNER_ID", "BATPAY_SECRET_KEY", "BATPAY_CLIENT_KEY", "BATPAY_CLIENT_SECRET", "BATPAY_PRIVATE_KEY", "BATPAY_MERCHANT_ID", "BATPAY_WEBHOOK_TOKEN"):
-        monkeypatch.delenv(k, raising=False)
-    c = bp.BatpayClient()
+def test_client_placeholder_when_empty():
+    c = bp.BatpayClient()  # env sudah dibersihkan oleh fixture _clean_env
     assert not c.enabled and c.mode == "batpay_placeholder" and not c.webhook_ready
     assert c.status == "placeholder" and c.public_config()["status"] == "placeholder"
     ins = c.placeholder_instructions(10000, "qris")

@@ -111,13 +111,19 @@ async def build_charge(order: Order) -> dict[str, Any]:
                 "instructions": {"type": "piutang", "status": "piutang", "message": "Dicatat sebagai piutang, dilunasi melalui admin"}, "raw": {"method": "piutang"}}
 
     # online (BATPay)
-    channel = batpay.normalize_channel(order.payment_channel)
+    requested = (order.payment_channel or "qris").strip().lower()
+    if not batpay.is_valid_channel(requested):
+        available = ", ".join(c["key"] for c in batpay.channels())
+        raise HTTPException(422, f"Kanal pembayaran '{requested}' tidak tersedia. Pilihan: {available}")
+    channel = requested
     order.payment_channel = channel
     fee = batpay.service_fee(base, channel)
     order.service_fee = Decimal(fee)
     recompute_total(order)
     amount = int(order.total)
-    common = {"type": "online", "provider": PROVIDER, "channel": channel, "amount": amount, "base_amount": base, "service_fee": fee}
+    ch_info = next((c for c in batpay.channels() if c["key"] == channel), {})
+    common = {"type": "online", "provider": PROVIDER, "channel": channel, "amount": amount, "base_amount": base, "service_fee": fee,
+              "fee_label": ch_info.get("fee_label", "")}
     if not batpay.enabled:
         return {"provider": PROVIDER, "payment_status": "pending", "order_status": None, "reference": None,
                 "instructions": {**common, **batpay.placeholder_instructions(amount, channel)}, "raw": {"method": "online", "channel": channel, "status": "awaiting_integration"}}
@@ -197,15 +203,18 @@ async def sync_remote_status(db: AsyncSession, order: Order) -> None:
 @router.get("/config")
 async def payment_config():
     """Metode pembayaran + kanal Bayar Online (biaya layanan per kanal)."""
-    return {"mode": batpay.mode, "provider": PROVIDER, "online_enabled": batpay.enabled, "methods": methods_config()}
+    return {"mode": batpay.mode, "provider": PROVIDER, "online_enabled": batpay.enabled, "methods": methods_config(), "fee_policy": batpay.fee_policy.describe()}
 
 
 @router.get("/fee")
 async def payment_fee(amount: float = Query(ge=0), channel: Optional[str] = Query(default="qris")):
-    """Pratinjau biaya layanan Bayar Online untuk nominal & kanal tertentu (dipakai halaman checkout)."""
+    """Pratinjau biaya layanan Bayar Online untuk nominal & kanal tertentu (dipakai halaman checkout).
+
+    QRIS: gratis s.d. ambang (default Rp500.000), di atasnya persen gross-up. VA: tarif flat per bank.
+    """
     ch = batpay.normalize_channel(channel)
     fee = batpay.service_fee(amount, ch)
-    return {"channel": ch, "base_amount": amount, "service_fee": fee, "total": amount + fee,
+    return {"channel": ch, "base_amount": amount, "service_fee": fee, "total": amount + fee, "fee_policy": batpay.fee_policy.describe(),
             "channels": [{**c, "service_fee": batpay.service_fee(amount, c["key"]), "total": amount + batpay.service_fee(amount, c["key"])} for c in batpay.channels()]}
 
 

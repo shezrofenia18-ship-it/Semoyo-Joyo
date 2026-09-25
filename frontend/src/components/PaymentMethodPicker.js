@@ -45,6 +45,7 @@ export function PaymentMethodPicker({ method, onMethodChange, channel, onChannel
     () => fee?.channels || config?.methods?.find((m) => m.key === "online")?.channels || [],
     [fee, config],
   );
+  const qrisPolicy = fee?.fee_policy?.qris || config?.fee_policy?.qris || null;
 
   useEffect(() => {
     if (method === "online" && channels.length && !channels.some((c) => c.key === channel)) onChannelChange?.(channels[0].key);
@@ -118,8 +119,8 @@ export function PaymentMethodPicker({ method, onMethodChange, channel, onChannel
                   <span className="min-w-0 flex-1">
                     <span className="block text-sm font-semibold">{c.name}</span>
                     <span className="block text-xs text-muted-foreground">
-                      Biaya layanan {c.fee_percent > 0 ? `${c.fee_percent}%` : ""}{c.fee_percent > 0 && c.fee_fixed > 0 ? " + " : ""}{c.fee_fixed > 0 ? rupiah(c.fee_fixed) : ""}
-                      {svc !== null && amount > 0 && <> · <b className="text-foreground">{rupiah(svc)}</b></>}
+                      Biaya layanan: {c.fee_label || (c.fee_fixed > 0 ? rupiah(c.fee_fixed) : c.fee_percent > 0 ? `${c.fee_percent}%` : "Gratis")}
+                      {svc !== null && amount > 0 && <> · <b className="text-foreground" data-testid={`channel-fee-${c.key}`}>{svc > 0 ? rupiah(svc) : "Gratis"}</b></>}
                     </span>
                     {svc !== null && amount > 0 && (
                       <span className="mt-1 block text-xs">Total bayar: <b className="font-display text-sm text-primary" data-testid={`channel-total-${c.key}`}>{rupiah(c.total)}</b></span>
@@ -129,7 +130,7 @@ export function PaymentMethodPicker({ method, onMethodChange, channel, onChannel
               );
             })}
           </div>
-          <p className="flex items-start gap-1.5 text-[11px] text-muted-foreground"><Info className="mt-0.5 h-3 w-3 shrink-0" /> Biaya layanan dihitung otomatis (gross-up) agar dana yang diterima toko tetap utuh.</p>
+          <p className="flex items-start gap-1.5 text-[11px] text-muted-foreground"><Info className="mt-0.5 h-3 w-3 shrink-0" /> QRIS gratis untuk belanja s.d. {rupiah(qrisPolicy?.threshold ?? 500000)} ({qrisPolicy?.percent_above ?? 0.3}% di atasnya, dana toko tetap utuh). Virtual Account dikenai tarif tetap per bank.</p>
         </div>
       )}
     </div>

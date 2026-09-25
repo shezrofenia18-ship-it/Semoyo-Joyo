@@ -30,10 +30,14 @@ Push seluruh folder proyek (`backend/`, `frontend/`, `docker-compose.yml`, `.env
 Metode pembayaran di checkout (dropdown, tepat 3 opsi):
 - **Cash (Tunai)** - pesanan berstatus **Proses** (bayar & pesanan). Admin/Owner menekan **"Selesai / Terima Uang"** di detail pesanan -> pembayaran **Lunas**, pesanan **Selesai**.
 - **Bayar Nanti** - pesanan berstatus **Piutang** dan masuk modul Piutang (dilunasi admin via "Tandai Lunas").
-- **Bayar Online (BATPay)** - QRIS dinamis atau Virtual Account (BCA/Mandiri/CIMB/Danamon). Pembeli memilih kanal saat checkout dan melihat
-  **Biaya Layanan** per kanal (gross-up otomatis dari MDR agar dana yang cair ke toko utuh). Default global `BATPAY_FEE_PERCENT=0.7` (%) dan
-  `BATPAY_FEE_FIXED=0` (Rp); bisa di-override per kanal lewat `BATPAY_QRIS_FEE_PERCENT/FIXED` dan `BATPAY_VA_FEE_PERCENT/FIXED` (kosong = pakai default).
-  Rumus: `total = ceil((dasar + biaya_tetap) / (1 - persen/100))`, `biaya_layanan = total - dasar`.
+- **Bayar Online (BATPay)** - QRIS dinamis atau Virtual Account (BCA, Mandiri, BRI, BNI, BSI, CIMB Niaga, Danamon, Permata, BTN, BJB, Neo Commerce).
+  Pembeli memilih kanal saat checkout dan melihat **Biaya Layanan** per kanal. Aturan biaya tertanam di kode (`backend/payments/batpay.py`, kelas `FeePolicy`):
+  - **QRIS bertingkat**: belanja (subtotal + ongkir) `<= Rp500.000` -> **gratis**; `> Rp500.000` -> **0,3%** gross-up
+    (`total = ceil(dasar / (1 - 0,3%))`, `biaya = total - dasar`) agar dana yang cair ke toko utuh.
+  - **Virtual Account tarif flat** per transaksi: **BCA Rp4.000**, **BSI Rp2.500**, bank lain **Rp2.000**.
+  - Override opsional tanpa ubah kode: `BATPAY_QRIS_FEE_THRESHOLD`, `BATPAY_QRIS_FEE_PERCENT`, `BATPAY_VA_FLAT_FEES` (`bca=4000,bsi=2500`),
+    `BATPAY_VA_FLAT_FEE_DEFAULT`. Bank yang ditawarkan: `BATPAY_VA_BANKS` (kosong = semua). Kode `paymentType` SNAP per bank mengikuti
+    konvensi `<BANK>_DYNAMIC` dan dapat dikoreksi via `BATPAY_VA_PAYMENT_TYPES` (mis. `neo=NEOBANK_DYNAMIC`) bila BATPay memakai kode lain.
   Status **Lunas** & pesanan **Selesai** otomatis saat webhook BATPay masuk.
 
 Admin dapat mengubah metode pembayaran pesanan yang belum lunas lewat **"Ubah Metode Pembayaran"** di panel detail pesanan (biaya layanan dihitung ulang otomatis).

@@ -121,3 +121,19 @@ Brand: Biru #0B4EA2 (primary), Kuning #F5C400 (aksen), Putih. Logo: frontend/pub
 - Dokumen: .env.example (nama env PARTNER_ID/CLIENT_ID/SECRET_KEY + FORCE_PLACEHOLDER), README-DEPLOY (bagian kill-switch), docker-compose.
 - Status workspace (update): BATPAY_PRIVATE_KEY terisi (RSA-2048 valid), BATPAY_FORCE_PLACEHOLDER=false -> mode `batpay_sandbox` AKTIF ke https://sg-openapi.batbiz.id. Uji Koneksi / E2E nyata BELUM dijalankan (menunggu instruksi user).
 - Git: staging & main tersinkron (main 0927046 = tree staging 515242a); travoy.py & file platform sisa konflik dihapus dari main.
+
+## Tahap 8 (Sep 2026): Kebijakan Biaya Layanan Baru & 11 Bank VA - SELESAI
+- `FeePolicy` (backend/payments/batpay.py) - aturan bisnis tertanam di kode, env hanya override opsional:
+  - QRIS bertingkat: dasar (subtotal+ongkir) <= Rp500.000 -> gratis; > Rp500.000 -> 0,3% gross-up (ceil(dasar/(1-0,3%)) - dasar).
+  - VA flat per bank: BCA Rp4.000, BSI Rp2.500, lainnya Rp2.000 (Mandiri, BRI, BNI, CIMB, Danamon, Permata, BTN, BJB, Neo).
+  - Override: BATPAY_QRIS_FEE_THRESHOLD, BATPAY_QRIS_FEE_PERCENT, BATPAY_VA_FLAT_FEES ("bca=4000,bsi=2500"), BATPAY_VA_FLAT_FEE_DEFAULT.
+  - Env lama BATPAY_FEE_PERCENT/FIXED & *_FEE_PERCENT/FIXED DIHAPUS.
+- VA_BANKS diperluas ke 11 bank; paymentType SNAP mengikuti konvensi <BANK>_DYNAMIC (BRI/BNI/BSI/PERMATA/BTN/BJB/NEO belum dikonfirmasi ke
+  dokumen BATPay) dan bisa dikoreksi via BATPAY_VA_PAYMENT_TYPES ("neo=NEOBANK_DYNAMIC"). Default BATPAY_VA_BANKS = semua bank.
+- Validator `payment_channel` (schemas.normalize_payment_channel): lowercase/strip, wajib `qris` atau `va_<kode>`; kanal tak tersedia -> 422
+  di build_charge (tidak lagi diam-diam jatuh ke QRIS). create_va menolak bank tak dikenal/tak diaktifkan.
+- API: /api/payments/config & /api/payments/fee kini memuat `fee_policy`; channels punya fee_type/fee_label/fee_threshold/payment_type/bank_code.
+  public_config: `fees` diganti `fee_policy`.
+- UI: PaymentMethodPicker menampilkan fee_label per kanal & catatan kebijakan; Admin Pengaturan -> Bayar Online kartu biaya baru (QRIS bertingkat, VA flat, contoh).
+- Tes: test_batpay_core 33 (kebijakan, override, 11 bank, payment type override), test_payments_refactor 29 (guard placeholder + kebijakan + bank baru + 422),
+  backend_test.py 19 - semua lulus dalam mode placeholder sementara. Kill-switch dikembalikan ke false (mode aktif) setelah tes.

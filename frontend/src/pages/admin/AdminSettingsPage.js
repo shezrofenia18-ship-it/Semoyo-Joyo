@@ -348,12 +348,11 @@ const CRED_LABEL = {
   merchant_id: "BATPAY_MERCHANT_ID", webhook_token: "BATPAY_WEBHOOK_TOKEN (opsional)",
 };
 
-const fmtFee = (f) => {
-  if (!f) return "-";
-  const parts = [];
-  if (Number(f.percent) > 0) parts.push(`${Number(f.percent).toLocaleString("id-ID", { maximumFractionDigits: 3 })}%`);
-  if (Number(f.fixed) > 0) parts.push(rupiah(f.fixed));
-  return parts.length ? parts.join(" + ") : "Gratis";
+const fmtPct = (p) => `${Number(p || 0).toLocaleString("id-ID", { maximumFractionDigits: 3 })}%`;
+/** Simulasi biaya QRIS bertingkat (gross-up) di sisi UI, hanya untuk contoh. */
+const qrisFeeExample = (base, policy) => {
+  if (!policy || base <= Number(policy.threshold || 0) || Number(policy.percent_above) <= 0) return 0;
+  return Math.max(0, Math.ceil(base / (1 - Number(policy.percent_above) / 100) - 1e-9) - base);
 };
 
 function CopyField({ label, value, testId, icon: I }) {
@@ -417,6 +416,8 @@ function PaymentGatewayTab() {
   const envLabel = cfg.env === "production" ? "Production" : (cfg.base_url || "").includes("sg-openapi") ? "Staging" : "Sandbox";
   const qrisChannels = (cfg.channels || []).filter((c) => c.group === "qris");
   const vaChannels = (cfg.channels || []).filter((c) => c.group === "va");
+  const qrisPolicy = cfg.fee_policy?.qris || null;
+  const vaPolicy = cfg.fee_policy?.va || null;
 
   return (
     <div className="space-y-4" data-testid="batpay-tab">
@@ -476,18 +477,26 @@ function PaymentGatewayTab() {
         <Card data-testid="batpay-fee-card">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base"><Percent className="h-4 w-4 text-primary" /> Biaya Layanan (dibebankan ke pembeli)</CardTitle>
-            <CardDescription>Gross-up otomatis dari MDR sehingga dana yang cair ke toko tetap utuh. Diatur lewat env <code className="rounded bg-muted px-1 font-mono text-[11px]">BATPAY_FEE_PERCENT</code> / <code className="rounded bg-muted px-1 font-mono text-[11px]">BATPAY_FEE_FIXED</code>, override per kanal opsional.</CardDescription>
+            <CardDescription>Aturan biaya tertanam di aplikasi: QRIS bertingkat berdasarkan nominal, Virtual Account tarif tetap per bank. Dana yang cair ke toko tetap utuh.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="grid grid-cols-3 gap-2 text-sm">
-              {[["default", "Default global"], ["qris", "QRIS"], ["va", "Virtual Account"]].map(([k, label]) => (
-                <div key={k} className="rounded-lg border bg-card p-3" data-testid={`batpay-fee-${k}`}>
-                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</p>
-                  <p className="mt-1 font-semibold">{fmtFee(cfg.fees?.[k])}</p>
-                </div>
-              ))}
+            <div className="grid gap-2 text-sm sm:grid-cols-2">
+              <div className="rounded-lg border bg-card p-3" data-testid="batpay-fee-qris">
+                <p className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground"><QrCode className="h-3.5 w-3.5" /> QRIS - bertingkat</p>
+                <p className="mt-1 font-semibold">{qrisPolicy ? `Gratis s.d. ${rupiah(qrisPolicy.threshold)}` : "-"}</p>
+                <p className="text-xs text-muted-foreground">{qrisPolicy ? `Belanja di atas ${rupiah(qrisPolicy.threshold)} dikenai ${fmtPct(qrisPolicy.percent_above)} (gross-up)` : ""}</p>
+              </div>
+              <div className="rounded-lg border bg-card p-3" data-testid="batpay-fee-va">
+                <p className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground"><Landmark className="h-3.5 w-3.5" /> Virtual Account - tarif tetap</p>
+                <p className="mt-1 font-semibold">{vaPolicy ? `Default ${rupiah(vaPolicy.default)} / transaksi` : "-"}</p>
+                <p className="text-xs text-muted-foreground">
+                  {vaPolicy ? Object.entries(vaPolicy.by_bank || {}).filter(([, v]) => Number(v) !== Number(vaPolicy.default)).map(([b, v]) => `${b.toUpperCase()} ${rupiah(v)}`).join(" · ") || "Semua bank tarif sama" : ""}
+                </p>
+              </div>
             </div>
-            <p className="text-xs text-muted-foreground">Rumus: total = ceil((dasar + biaya tetap) / (1 - persen/100)); biaya layanan = total - dasar. Contoh {rupiah(100000)} dengan {fmtFee(cfg.fees?.default)} → pembeli membayar {rupiah(100000 + Math.max(0, Math.ceil((100000 + Number(cfg.fees?.default?.fixed || 0)) / (1 - Number(cfg.fees?.default?.percent || 0) / 100) - 1e-9) - 100000))}.</p>
+            <p className="text-xs text-muted-foreground" data-testid="batpay-fee-example">
+              Contoh QRIS: belanja {rupiah(300000)} → biaya <b>{rupiah(qrisFeeExample(300000, qrisPolicy))}</b>; belanja {rupiah(600000)} → biaya <b>{rupiah(qrisFeeExample(600000, qrisPolicy))}</b> (pembeli membayar {rupiah(600000 + qrisFeeExample(600000, qrisPolicy))}).
+            </p>
             <p className="text-xs text-muted-foreground">Masa berlaku tagihan: <b>{cfg.expire_minutes} menit</b>. Biaya layanan dicatat terpisah dan tidak dihitung sebagai pendapatan toko.</p>
           </CardContent>
         </Card>
@@ -508,7 +517,7 @@ function PaymentGatewayTab() {
                       <span className="flex items-center gap-2">{c.group === "qris" ? <QrCode className="h-4 w-4 text-muted-foreground" /> : <Landmark className="h-4 w-4 text-muted-foreground" />} {c.name}</span>
                     </TableCell>
                     <TableCell><Badge variant="secondary" className="rounded-md uppercase">{c.group}</Badge></TableCell>
-                    <TableCell className="text-right text-sm">{fmtFee({ percent: c.fee_percent, fixed: c.fee_fixed })}</TableCell>
+                    <TableCell className="text-right text-sm">{c.fee_label || (c.fee_fixed > 0 ? rupiah(c.fee_fixed) : c.fee_percent > 0 ? fmtPct(c.fee_percent) : "Gratis")}</TableCell>
                     <TableCell className="text-right">
                       <Badge variant="outline" className={cn("rounded-md", active ? "border-emerald-300 text-emerald-700" : "border-amber-300 text-amber-700")}>{active ? "Aktif" : "Placeholder"}</Badge>
                     </TableCell>

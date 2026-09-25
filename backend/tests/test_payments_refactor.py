@@ -21,6 +21,15 @@ def s():
     return requests.Session()
 
 
+@pytest.fixture(scope="module", autouse=True)
+def _guard_placeholder_mode(s):
+    """Pengaman: suite ini membuat pesanan Bayar Online. Hanya boleh berjalan bila backend dalam mode placeholder
+    (payment_mode='batpay_placeholder'), agar tidak memicu tagihan nyata ke server BATPay."""
+    mode = s.get(f"{BASE_URL}/api/health", timeout=15).json().get("payment_mode")
+    if mode != "batpay_placeholder":
+        pytest.exit(f"Backend dalam mode '{mode}' (AKTIF). Set BATPAY_FORCE_PLACEHOLDER=true lalu restart backend sebelum menjalankan suite ini.", returncode=2)
+
+
 @pytest.fixture(scope="module")
 def owner_token(s):
     r = s.post(f"{BASE_URL}/api/admin/login", json={"username": os.environ.get("OWNER_USERNAME", "owner"), "password": os.environ.get("OWNER_PASSWORD", "owner123")})
@@ -79,6 +88,38 @@ def test_fee_preview_gross_up(s):
     by = {c["key"]: c for c in j["channels"]}
     assert by["qris"]["service_fee"] == j["service_fee"]
     assert by["va_bca"]["total"] == 100000 + by["va_bca"]["service_fee"]
+
+
+def test_fee_policy_qris_tiered_and_va_flat(s):
+    """QRIS: <= ambang gratis, di atasnya persen gross-up. VA: flat per bank (BCA 4000, BSI 2500, lain 2000) - default kode."""
+    pol = s.get(f"{BASE_URL}/api/payments/config").json()["fee_policy"]
+    thr, pct = pol["qris"]["threshold"], pol["qris"]["percent_above"]
+    assert pol["qris"]["type"] == "tiered_percent" and pol["va"]["type"] == "flat"
+    fee = lambda amount, ch: s.get(f"{BASE_URL}/api/payments/fee", params={"amount": amount, "channel": ch}).json()["service_fee"]  # noqa: E731
+    assert fee(thr, "qris") == 0 and fee(min(thr, 100000), "qris") == 0
+    above = fee(thr + 100000, "qris")
+    total = thr + 100000 + above
+    assert above > 0 and total - total * pct / 100 >= thr + 100000 - 1e-6  # gross-up: dana toko utuh
+    assert fee(50000, "va_bca") == pol["va"]["by_bank"]["bca"] == fee(5000000, "va_bca")  # flat, tak tergantung nominal
+    assert fee(50000, "va_bsi") == pol["va"]["by_bank"]["bsi"]
+    for b in ("mandiri", "bri", "bni", "cimb", "danamon", "permata", "btn", "bjb", "neo"):
+        assert fee(50000, f"va_{b}") == pol["va"]["by_bank"][b]
+    # tanpa override env: nilai default kode
+    if not os.environ.get("BATPAY_VA_FLAT_FEES") and not os.environ.get("BATPAY_QRIS_FEE_THRESHOLD"):
+        assert thr == 500000 and pct == 0.3 and pol["va"]["by_bank"]["bca"] == 4000 and pol["va"]["by_bank"]["bsi"] == 2500 and pol["va"]["default"] == 2000
+
+
+def test_checkout_new_va_banks_and_invalid_channel(s, product):
+    for ch in ("va_bri", "va_bni", "va_bsi", "va_permata", "va_btn", "va_bjb", "va_neo"):
+        r = s.post(f"{BASE_URL}/api/checkout", json=_payload(product, "online", ch))
+        assert r.status_code == 200, f"{ch}: {r.text}"
+        o = r.json()["order"]
+        assert o["payment_channel"] == ch and o["service_fee"] == s.get(f"{BASE_URL}/api/payments/fee", params={"amount": 1000, "channel": ch}).json()["service_fee"]
+    for bad in ("va_bankpalsu", "gopay", "VA-BCA"):
+        r = s.post(f"{BASE_URL}/api/checkout", json=_payload(product, "online", bad))
+        assert r.status_code == 422, f"{bad}: {r.status_code} {r.text}"
+    r = s.post(f"{BASE_URL}/api/checkout", json=_payload(product, "online", "VA_BCA"))
+    assert r.status_code == 200 and r.json()["order"]["payment_channel"] == "va_bca"
 
 
 # ---------- Cash ----------

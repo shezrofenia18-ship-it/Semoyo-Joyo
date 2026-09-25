@@ -1,10 +1,25 @@
 """Pydantic schemas (request/response) for the API."""
+import re
 from datetime import date, datetime
 from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 PaymentMethod = Literal["cash", "piutang", "online"]
+# Kanal Bayar Online: "qris" atau "va_<kode_bank>" (bca, mandiri, bri, bni, bsi, cimb, danamon, permata, btn, bjb, neo, ...).
+# Daftar bank aktif ditentukan runtime oleh payments.batpay (BATPAY_VA_BANKS); di sini hanya validasi bentuk.
+PAYMENT_CHANNEL_RE = re.compile(r"^(qris|va_[a-z0-9]{2,20})$")
+
+
+def normalize_payment_channel(v: Optional[str]) -> Optional[str]:
+    if v is None:
+        return None
+    c = str(v).strip().lower()
+    if not c:
+        return None
+    if not PAYMENT_CHANNEL_RE.match(c):
+        raise ValueError("payment_channel harus 'qris' atau 'va_<kode_bank>' (mis. va_bca, va_bri, va_bsi)")
+    return c
 OrderStatus = Literal["baru", "diproses", "dikirim", "selesai", "dibatalkan"]
 PaymentStatus = Literal["proses", "pending", "paid", "failed", "expired", "piutang"]
 
@@ -91,13 +106,18 @@ class CheckoutIn(BaseModel):
     address: str = Field(min_length=5)
     notes: Optional[str] = None
     payment_method: PaymentMethod
-    payment_channel: Optional[str] = Field(default=None, max_length=40, description="Kanal Bayar Online: qris | va_bca | va_mandiri | va_cimb | va_danamon")
+    payment_channel: Optional[str] = Field(default=None, max_length=40, description="Kanal Bayar Online: qris | va_<kode_bank> (va_bca, va_mandiri, va_bri, va_bni, va_bsi, va_cimb, va_danamon, va_permata, va_btn, va_bjb, va_neo)")
     items: list[CheckoutItemIn] = Field(min_length=1)
 
     @field_validator("full_name", "address")
     @classmethod
     def strip_text(cls, v: str) -> str:
         return v.strip()
+
+    @field_validator("payment_channel")
+    @classmethod
+    def check_channel(cls, v: Optional[str]) -> Optional[str]:
+        return normalize_payment_channel(v)
 
 
 class OrderItemOut(ORMModel):
@@ -148,6 +168,11 @@ class PaymentCreateIn(BaseModel):
     payment_method: Optional[PaymentMethod] = None
     payment_channel: Optional[str] = Field(default=None, max_length=40)
 
+    @field_validator("payment_channel")
+    @classmethod
+    def check_channel(cls, v: Optional[str]) -> Optional[str]:
+        return normalize_payment_channel(v)
+
 
 class PaymentInstructionOut(BaseModel):
     order_number: str
@@ -165,6 +190,11 @@ class PaymentMethodChangeIn(BaseModel):
     payment_method: PaymentMethod
     payment_channel: Optional[str] = Field(default=None, max_length=40)
     note: Optional[str] = None
+
+    @field_validator("payment_channel")
+    @classmethod
+    def check_channel(cls, v: Optional[str]) -> Optional[str]:
+        return normalize_payment_channel(v)
 
 
 # ---------- Admin ----------

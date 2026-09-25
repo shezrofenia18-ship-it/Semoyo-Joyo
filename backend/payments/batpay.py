@@ -19,8 +19,10 @@ Mode:
                dinonaktifkan (checkout online, uji koneksi, cek status, pembatalan tagihan). Dipakai selagi BATPay memproses
                whitelist API partner. Hapus / set false untuk mengaktifkan integrasi nyata.
 
-Biaya layanan (gross-up) agar dana yang cair ke toko utuh:
-  total_tagihan = ceil((dasar + biaya_tetap) / (1 - persen/100)); biaya_layanan = total_tagihan - dasar
+Biaya layanan (dibebankan ke pembeli) - aturan bisnis di kode (FeePolicy), env hanya override opsional:
+  - QRIS bertingkat : dasar <= Rp500.000 -> gratis; dasar > Rp500.000 -> 0,3% gross-up
+                      total = ceil(dasar / (1 - 0,3%)); biaya = total - dasar (dana cair ke toko utuh)
+  - VA tarif flat   : BCA Rp4.000, BSI Rp2.500, bank lain (Mandiri, BRI, BNI, CIMB, Danamon, Permata, BTN, BJB, Neo) Rp2.000
 """
 from __future__ import annotations
 
@@ -89,11 +91,26 @@ WEBHOOK_PATH = "/api/payments/batpay/webhook"
 QR_STATUS = {"00": "paid", "01": "pending", "02": "pending", "03": "pending", "04": "refunded", "05": "expired", "06": "failed", "07": "failed"}
 
 VA_BANKS = {
+    # key -> nama tampil & additionalInfo.paymentType SNAP BATPay (konvensi <BANK>_DYNAMIC; override via BATPAY_VA_PAYMENT_TYPES)
     "bca": {"name": "BCA", "payment_type": "BCA_DYNAMIC"},
     "mandiri": {"name": "Mandiri", "payment_type": "MANDIRI_DYNAMIC"},
+    "bri": {"name": "BRI", "payment_type": "BRI_DYNAMIC"},
+    "bni": {"name": "BNI", "payment_type": "BNI_DYNAMIC"},
+    "bsi": {"name": "BSI", "payment_type": "BSI_DYNAMIC"},
     "cimb": {"name": "CIMB Niaga", "payment_type": "CIMB_DYNAMIC"},
     "danamon": {"name": "Danamon", "payment_type": "DANAMON_DYNAMIC"},
+    "permata": {"name": "Permata", "payment_type": "PERMATA_DYNAMIC"},
+    "btn": {"name": "BTN", "payment_type": "BTN_DYNAMIC"},
+    "bjb": {"name": "BJB", "payment_type": "BJB_DYNAMIC"},
+    "neo": {"name": "Neo Commerce", "payment_type": "NEO_DYNAMIC"},
 }
+DEFAULT_VA_BANKS = ",".join(VA_BANKS)  # semua bank ditawarkan; persempit via BATPAY_VA_BANKS
+
+# Kebijakan biaya layanan default (aturan bisnis). Nilai di bawah adalah sumber kebenaran; env hanya override opsional.
+QRIS_FEE_THRESHOLD = 500_000   # dasar <= threshold -> gratis
+QRIS_FEE_PERCENT = 0.3         # dasar > threshold -> 0,3% (gross-up)
+VA_FLAT_FEES = {"bca": 4_000, "bsi": 2_500}
+VA_FLAT_FEE_DEFAULT = 2_000
 
 
 class BatpayError(Exception):
@@ -213,9 +230,9 @@ def generate_rsa_keypair() -> tuple[str, str]:
 
 
 # --------------------------------------------------------------------------------------
-# Biaya layanan (gross-up)
+# Biaya layanan
 # --------------------------------------------------------------------------------------
-def gross_up_fee(base_amount: int | float | Decimal, percent: float, fixed: float) -> int:
+def gross_up_fee(base_amount: int | float | Decimal, percent: float, fixed: float = 0) -> int:
     """Biaya layanan agar toko menerima `base_amount` utuh setelah potongan `percent`% + `fixed`.
 
     total = ceil((base + fixed) / (1 - percent/100)); fee = total - base. Dibulatkan ke atas ke rupiah penuh.
@@ -226,6 +243,80 @@ def gross_up_fee(base_amount: int | float | Decimal, percent: float, fixed: floa
     pct = max(0.0, min(float(percent or 0), 99.0)) / 100.0
     total = (base + float(fixed or 0)) / (1.0 - pct)
     return max(0, int(math.ceil(total - 1e-9)) - int(round(base)))
+
+
+def _parse_bank_map(raw: str, cast=int) -> dict[str, Any]:
+    """'bca=4000, bsi=2500' -> {'bca': 4000, 'bsi': 2500}. Entri rusak diabaikan."""
+    out: dict[str, Any] = {}
+    for part in (raw or "").split(","):
+        if "=" not in part:
+            continue
+        k, v = part.split("=", 1)
+        k, v = k.strip().lower(), v.strip()
+        if not k or not v:
+            continue
+        try:
+            out[k] = cast(float(v)) if cast is int else cast(v)
+        except (TypeError, ValueError):
+            continue
+    return out
+
+
+class FeePolicy:
+    """Aturan biaya layanan Bayar Online (dibebankan ke pembeli).
+
+    QRIS  : bertingkat - dasar <= threshold gratis, di atasnya persen gross-up (dana cair ke toko utuh).
+    VA    : tarif flat per bank (Rp), tidak tergantung nominal.
+    Default berasal dari konstanta modul; env BATPAY_QRIS_FEE_THRESHOLD, BATPAY_QRIS_FEE_PERCENT,
+    BATPAY_VA_FLAT_FEES ('bca=4000,bsi=2500'), BATPAY_VA_FLAT_FEE_DEFAULT hanya override opsional.
+    """
+
+    def __init__(self) -> None:
+        self.qris_threshold = int(_env_float("BATPAY_QRIS_FEE_THRESHOLD", QRIS_FEE_THRESHOLD))
+        self.qris_percent = max(0.0, min(_env_float("BATPAY_QRIS_FEE_PERCENT", QRIS_FEE_PERCENT), 99.0))
+        self.va_flat_default = max(0, int(_env_float("BATPAY_VA_FLAT_FEE_DEFAULT", VA_FLAT_FEE_DEFAULT)))
+        self.va_flat_fees: dict[str, int] = {**VA_FLAT_FEES, **_parse_bank_map(_env("BATPAY_VA_FLAT_FEES"))}
+
+    # --- perhitungan ---
+    def qris_fee(self, base_amount: int | float | Decimal) -> int:
+        base = int(round(float(base_amount or 0)))
+        if base <= 0 or base <= self.qris_threshold:
+            return 0
+        return gross_up_fee(base, self.qris_percent, 0)
+
+    def va_fee(self, bank: str, base_amount: int | float | Decimal = 1) -> int:
+        if float(base_amount or 0) <= 0:
+            return 0
+        return max(0, int(self.va_flat_fees.get((bank or "").lower(), self.va_flat_default)))
+
+    def fee(self, base_amount: int | float | Decimal, channel: str) -> int:
+        ch = (channel or "qris").lower()
+        return self.va_fee(ch[3:], base_amount) if ch.startswith("va_") else self.qris_fee(base_amount)
+
+    # --- deskripsi untuk UI ---
+    def qris_label(self) -> str:
+        pct = f"{self.qris_percent:g}".replace(".", ",")
+        if self.qris_percent <= 0:
+            return "Gratis"
+        if self.qris_threshold <= 0:
+            return f"{pct}%"
+        return f"Gratis s.d. {rupiah(self.qris_threshold)}, {pct}% di atasnya"
+
+    def va_label(self, bank: str) -> str:
+        f = self.va_fee(bank)
+        return "Gratis" if f <= 0 else f"{rupiah(f)} / transaksi"
+
+    def describe(self) -> dict[str, Any]:
+        return {
+            "qris": {"type": "tiered_percent", "threshold": self.qris_threshold, "percent_below": 0.0, "percent_above": self.qris_percent,
+                     "label": self.qris_label()},
+            "va": {"type": "flat", "default": self.va_flat_default, "by_bank": {b: self.va_fee(b) for b in VA_BANKS},
+                   "label": f"Flat per bank (default {rupiah(self.va_flat_default)})"},
+        }
+
+
+def rupiah(n: int | float) -> str:
+    return "Rp" + f"{int(round(float(n or 0))):,}".replace(",", ".")
 
 
 # --------------------------------------------------------------------------------------
@@ -250,16 +341,15 @@ class BatpayClient:
         # Kill-switch: paksa mode placeholder walau kredensial lengkap (tidak ada panggilan keluar ke BATPay).
         self.force_placeholder = _env_bool("BATPAY_FORCE_PLACEHOLDER", False)
         self.expire_minutes = int(_env_float("BATPAY_EXPIRE_MINUTES", 60))
-        # Biaya layanan: default global BATPAY_FEE_PERCENT (0,7%) & BATPAY_FEE_FIXED (Rp0),
-        # bisa di-override per kanal lewat BATPAY_QRIS_FEE_* / BATPAY_VA_FEE_* (opsional, kosong = pakai global).
-        self.fee_percent = _env_float("BATPAY_FEE_PERCENT", 0.7)
-        self.fee_fixed = _env_float("BATPAY_FEE_FIXED", 0)
-        self.fees = {
-            "qris": {"percent": _env_float("BATPAY_QRIS_FEE_PERCENT", self.fee_percent), "fixed": _env_float("BATPAY_QRIS_FEE_FIXED", self.fee_fixed)},
-            "va": {"percent": _env_float("BATPAY_VA_FEE_PERCENT", self.fee_percent), "fixed": _env_float("BATPAY_VA_FEE_FIXED", self.fee_fixed)},
-        }
-        banks = [b.strip().lower() for b in _env("BATPAY_VA_BANKS", "BCA,MANDIRI,CIMB,DANAMON").split(",") if b.strip()]
+        # Biaya layanan: aturan bisnis di FeePolicy (QRIS bertingkat, VA flat per bank).
+        self.fee_policy = FeePolicy()
+        # Bank VA yang ditawarkan (default: semua yang dikenal). paymentType SNAP bisa di-override: BATPAY_VA_PAYMENT_TYPES="neo=NEOBANK_DYNAMIC".
+        banks = [b.strip().lower() for b in _env("BATPAY_VA_BANKS", DEFAULT_VA_BANKS).split(",") if b.strip()]
         self.va_banks = [b for b in banks if b in VA_BANKS] or list(VA_BANKS)
+        self.va_payment_types = {b: VA_BANKS[b]["payment_type"] for b in VA_BANKS}
+        for b, pt in _parse_bank_map(_env("BATPAY_VA_PAYMENT_TYPES"), cast=str).items():
+            if b in self.va_payment_types and pt:
+                self.va_payment_types[b] = pt.upper()
         self._token: Optional[str] = None
         self._token_exp: float = 0.0
 
@@ -297,25 +387,29 @@ class BatpayClient:
         return self.enabled or bool(self.webhook_token)
 
     def channels(self) -> list[dict[str, Any]]:
-        """Daftar kanal Bayar Online untuk checkout (biaya per kanal)."""
+        """Daftar kanal Bayar Online untuk checkout (aturan biaya per kanal)."""
+        fp = self.fee_policy
         out = [{"key": "qris", "name": "QRIS", "group": "qris", "description": "Scan QR dari semua e-wallet & mobile banking",
-                "fee_percent": self.fees["qris"]["percent"], "fee_fixed": self.fees["qris"]["fixed"]}]
+                "fee_type": "tiered_percent", "fee_percent": fp.qris_percent, "fee_fixed": 0, "fee_threshold": fp.qris_threshold,
+                "fee_label": fp.qris_label()}]
         for b in self.va_banks:
             info = VA_BANKS[b]
-            out.append({"key": f"va_{b}", "name": f"Virtual Account {info['name']}", "group": "va", "bank": info["name"],
+            out.append({"key": f"va_{b}", "name": f"Virtual Account {info['name']}", "group": "va", "bank": info["name"], "bank_code": b,
+                        "payment_type": self.va_payment_types[b],
                         "description": f"Transfer ke nomor VA {info['name']} (ATM / m-banking)",
-                        "fee_percent": self.fees["va"]["percent"], "fee_fixed": self.fees["va"]["fixed"]})
+                        "fee_type": "flat", "fee_percent": 0, "fee_fixed": fp.va_fee(b), "fee_threshold": 0, "fee_label": fp.va_label(b)})
         return out
+
+    def is_valid_channel(self, channel: Optional[str]) -> bool:
+        return (channel or "").strip().lower() in {ch["key"] for ch in self.channels()}
 
     def normalize_channel(self, channel: Optional[str]) -> str:
         c = (channel or "qris").strip().lower()
-        valid = {ch["key"] for ch in self.channels()}
-        return c if c in valid else "qris"
+        return c if self.is_valid_channel(c) else "qris"
 
     def service_fee(self, base_amount: int | float | Decimal, channel: Optional[str]) -> int:
-        group = "va" if self.normalize_channel(channel).startswith("va_") else "qris"
-        f = self.fees[group]
-        return gross_up_fee(base_amount, f["percent"], f["fixed"])
+        """Biaya layanan (Rp bulat) untuk kanal: QRIS bertingkat, VA flat per bank."""
+        return self.fee_policy.fee(base_amount, self.normalize_channel(channel))
 
     def public_config(self, app_url: str = "") -> dict[str, Any]:
         base = (app_url or "").rstrip("/")
@@ -328,7 +422,7 @@ class BatpayClient:
             "merchant_id": self.merchant_id, "partner_id_hint": (self.partner_id[:6] + "..." + self.partner_id[-4:]) if len(self.partner_id) > 12 else bool(self.partner_id),
             "webhook_ready": self.webhook_ready, "webhook_url": f"{base}{WEBHOOK_PATH}", "token_url": f"{base}{INBOUND_TOKEN_PATH}",
             "channels": self.channels(), "expire_minutes": self.expire_minutes,
-            "fees": {"default": {"percent": self.fee_percent, "fixed": self.fee_fixed}, "qris": self.fees["qris"], "va": self.fees["va"]},
+            "fee_policy": self.fee_policy.describe(),
             "va_banks": [VA_BANKS[b]["name"] for b in self.va_banks],
             "configured": configured,
         }
@@ -442,15 +536,19 @@ class BatpayClient:
 
     # ---------- Virtual Account ----------
     async def create_va(self, *, reference: str, bank: str, amount: int, customer_name: str, phone: str) -> dict[str, Any]:
-        info = VA_BANKS.get(bank) or VA_BANKS["bca"]
+        bank = (bank or "").lower()
+        if bank not in VA_BANKS or bank not in self.va_banks:
+            raise BatpayError(f"Bank VA '{bank}' tidak didukung/tidak diaktifkan", code="unsupported_bank")
+        info = VA_BANKS[bank]
         expires = datetime.now(timezone.utc) + timedelta(minutes=max(self.expire_minutes, 60))
         digits = "".join(ch for ch in (phone or "") if ch.isdigit())[:20] or f"{int(time.time())}"
         body = {"virtualAccountName": "".join(ch for ch in customer_name if ch.isalnum() or ch == " ")[:255] or "Pelanggan", "trxId": reference,
-                "totalAmount": money(amount), "expiredDate": wib_timestamp(expires), "additionalInfo": {"accountNo": digits, "paymentType": info["payment_type"]}}
+                "totalAmount": money(amount), "expiredDate": wib_timestamp(expires), "additionalInfo": {"accountNo": digits, "paymentType": self.va_payment_types[bank]}}
         data = await self._post(PATH_VA_CREATE, body, "create VA")
         va = data.get("virtualAccountData", {})
         return {"reference": reference, "provider_ref": (va.get("virtualAccountNo") or "").strip(), "va_number": (va.get("virtualAccountNo") or "").strip(),
-                "bank_name": info["name"], "partner_service_id": va.get("partnerServiceId"), "customer_no": va.get("customerNo"),
+                "bank_name": info["name"], "bank_code": bank, "payment_type": self.va_payment_types[bank],
+                "partner_service_id": va.get("partnerServiceId"), "customer_no": va.get("customerNo"),
                 "expires_at": expires.isoformat(), "raw": data}
 
     @staticmethod

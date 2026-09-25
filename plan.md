@@ -147,3 +147,6 @@
   checkout Bayar Online nonaktif).
 - [ ] MENUNGGU USER: whitelist API BATPay selesai -> isi BATPAY_PRIVATE_KEY, hapus BATPAY_FORCE_PLACEHOLDER, restart, uji koneksi & E2E nyata
   (token B2B -> QRIS/VA -> webhook SNAP). JANGAN jalankan sebelum instruksi user.
+- [x] Tahap 8: FeePolicy (QRIS <=500rb gratis / 0,3% di atasnya gross-up; VA flat BCA 4.000, BSI 2.500, lain 2.000), 11 bank VA
+  (+BRI, BNI, BSI, Permata, BTN, BJB, Neo), validator kanal 422, UI biaya baru. Tes 33+29+19 lulus (placeholder). Detail di memory/PRD.md.
+- [ ] Konfirmasi kode paymentType SNAP bank baru ke BATPay (BRI_DYNAMIC dst.) - koreksi via BATPAY_VA_PAYMENT_TYPES bila berbeda.
