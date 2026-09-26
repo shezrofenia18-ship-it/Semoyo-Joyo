@@ -56,7 +56,7 @@ export default function HomePage() {
                 <ShieldCheck className="h-3.5 w-3.5 text-primary" /> Semoyo Joyo &middot; Solusi Belanja Terpercaya
               </span>
               <h1 className="mt-4 font-display text-3xl font-semibold leading-tight tracking-tight sm:text-4xl lg:text-5xl">
-                Pasokan bahan baku segar, harga B2B transparan.
+                Pasokan bahan baku segar, harga transparan.
               </h1>
               <p className="mt-4 max-w-xl text-base text-muted-foreground sm:text-lg">
                 Pesan beras, protein, sayur, buah, dan bumbu dalam jumlah besar. Checkout cepat tanpa registrasi, cukup nama / nama usaha dan nomor WA.
